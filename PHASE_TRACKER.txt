@@ -1,0 +1,147 @@
+LoreCraft Phase Tracker
+Updated: 2026-04-19
+
+Status Legend
+- DONE: completed and verified
+- IN PROGRESS: actively under implementation
+- TODO: not started
+
+Phase Summary
+- Phase 0 - Scaffold: DONE
+- Phase 1 - Core Layer: DONE
+- Phase 2 - Memory Layer: DONE
+- Phase 3 - LLM Layer: DONE
+- Phase 4 - Prompt Layer: TODO
+- Phase 5 - Agent Layer: TODO
+- Phase 6 - Command Layer Expansion: TODO
+- Phase 7 - TUI Layer: TODO
+- Phase 8 - Hardening and Optimization: TODO
+
+Completed Work
+
+Phase 0 - Scaffold
+Added files:
+- package.json
+- tsconfig.json
+- tsup.config.ts
+- vitest.config.ts
+- eslint.config.js
+- .gitignore
+
+Phase 1 - Core Layer
+Added files:
+- src/main.ts
+- src/cli/index.ts
+- src/cli/commands/init.ts
+- src/cli/commands/status.ts
+- src/core/config.ts
+- src/core/event-bus.ts
+- src/core/permissions.ts
+- src/core/project.ts
+- src/core/transaction.ts
+- src/session/manager.ts
+- src/shared/constants.ts
+- src/shared/errors.ts
+- src/shared/types.ts
+- src/shared/utils.ts
+- src/types/write-file-atomic.d.ts
+- tests/core/permissions.test.ts
+- tests/core/project.test.ts
+- tests/core/transaction.test.ts
+
+Phase 2 - Memory Layer
+Added files:
+- src/memory/schema.ts
+- src/memory/store.ts
+- src/memory/tokenizer.ts
+- src/memory/mention-tracker.ts
+- src/memory/indexer.ts
+- src/memory/retrieval.ts
+- src/memory/vector.ts
+- tests/memory/store.test.ts
+- tests/memory/tokenizer.test.ts
+- tests/memory/mention-tracker.test.ts
+- tests/memory/retrieval.test.ts
+
+Phase 3 - LLM Layer
+Added files:
+- src/llm/types.ts
+- src/llm/client.ts
+- src/llm/providers/openrouter.ts
+- src/llm/providers/embedding.ts
+- src/llm/providers/anthropic.ts
+- tests/llm/client.test.ts
+
+In Progress
+
+- No active phase at the moment. Next recommended target: Phase 4 - Prompt Layer.
+
+Pending Phases
+
+Phase 4 - Prompt Layer
+Planned files:
+- src/llm/prompts/system-writer.ts
+- src/llm/prompts/system-reviewer.ts
+- src/llm/prompts/system-extractor.ts
+- src/llm/prompts/system-orchestrator.ts
+- src/llm/prompts/style-analyzer.ts
+- src/llm/prompts/expand-planner.ts
+
+Phase 5 - Agent Layer
+Planned files:
+- src/agents/orchestrator.ts
+- src/agents/context-builder.ts
+- src/agents/writer.ts
+- src/agents/reviewer.ts
+- src/agents/extractor.ts
+
+Phase 6 - Command Layer Expansion
+Planned files:
+- src/cli/commands/plan.ts
+- src/cli/commands/expand.ts
+- src/cli/commands/outline.ts
+- src/cli/commands/restructure.ts
+- src/cli/commands/write.ts
+- src/cli/commands/continue.ts
+- src/cli/commands/rewrite.ts
+- src/cli/commands/check.ts
+- src/cli/commands/diff.ts
+- src/cli/commands/commit.ts
+- src/cli/commands/rollback.ts
+- src/cli/commands/history.ts
+- src/cli/commands/lookup.ts
+- src/cli/commands/remember.ts
+- src/cli/commands/reindex.ts
+- src/cli/commands/timeline.ts
+- src/cli/commands/characters.ts
+- src/cli/commands/style.ts
+- src/cli/commands/config.ts
+- src/cli/commands/export.ts
+
+Phase 7 - TUI Layer
+Planned files:
+- src/tui/app.tsx
+- src/tui/views/chat.tsx
+- src/tui/views/diff.tsx
+- src/tui/views/memory.tsx
+- src/tui/views/outline-tree.tsx
+- src/tui/views/conflicts.tsx
+- src/tui/views/tasks.tsx
+- src/tui/views/confirm.tsx
+- src/tui/views/dashboard.tsx
+- src/tui/components/panel.tsx
+- src/tui/components/markdown.tsx
+- src/tui/components/scroll-list.tsx
+- src/tui/components/input.tsx
+- src/tui/hooks/use-agent.ts
+- src/tui/hooks/use-project.ts
+
+Phase 8 - Hardening and Optimization
+Planned areas:
+- richer `/style analyze`
+- `/expand` diff quality
+- sparse retrieval integration
+- sandbox hardening
+- templates
+- logging and diagnostics
+- performance tuning

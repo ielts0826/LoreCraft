@@ -12,5 +12,6 @@ describe("cli command registration", () => {
     expect(commandNames).toContain("write");
     expect(commandNames).toContain("plan");
     expect(commandNames).toContain("expand");
+    expect(commandNames).toContain("tui");
   });
 });

@@ -14,7 +14,7 @@ Phase Summary
 - Phase 4 - Prompt Layer: DONE
 - Phase 5 - Agent Layer: DONE
 - Phase 6 - Command Layer Expansion: DONE
-- Phase 7 - TUI Layer: TODO
+- Phase 7 - TUI Layer: DONE
 - Phase 8 - Hardening and Optimization: TODO
 
 Completed Work
@@ -104,15 +104,12 @@ Added files:
 - src/shared/node-sqlite.ts
 - tests/cli/commands.test.ts
 
-In Progress
-
-- No active phase at the moment. Next recommended target: Phase 7 - TUI Layer.
-
-Pending Phases
-
 Phase 7 - TUI Layer
-Planned files:
+Added files:
+- src/cli/commands/tui.ts
 - src/tui/app.tsx
+- src/tui/model.ts
+- src/tui/theme.ts
 - src/tui/views/chat.tsx
 - src/tui/views/diff.tsx
 - src/tui/views/memory.tsx
@@ -127,6 +124,17 @@ Planned files:
 - src/tui/components/input.tsx
 - src/tui/hooks/use-agent.ts
 - src/tui/hooks/use-project.ts
+- tests/tui/model.test.ts
+Updated existing files:
+- package.json
+- tsconfig.json
+- src/cli/index.ts
+
+In Progress
+
+- No active phase at the moment. Next recommended target: Phase 8 - Hardening and Optimization.
+
+Pending Phases
 
 Phase 8 - Hardening and Optimization
 Planned areas:

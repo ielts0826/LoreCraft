@@ -6,6 +6,7 @@ import { createInitCommand } from "./commands/init.js";
 import { createLookupCommand } from "./commands/lookup.js";
 import { createPlanCommand } from "./commands/plan.js";
 import { createStatusCommand } from "./commands/status.js";
+import { createTuiCommand } from "./commands/tui.js";
 import { createWriteCommand } from "./commands/write.js";
 
 export function createCli(): Command {
@@ -18,5 +19,6 @@ export function createCli(): Command {
   program.addCommand(createWriteCommand());
   program.addCommand(createPlanCommand());
   program.addCommand(createExpandCommand());
+  program.addCommand(createTuiCommand());
   return program;
 }

@@ -3,6 +3,7 @@
     "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
+    "jsx": "react-jsx",
     "lib": ["ES2022"],
     "strict": true,
     "noImplicitOverride": true,
@@ -15,8 +16,17 @@
     "declaration": false,
     "sourceMap": true,
     "skipLibCheck": true,
-    "types": ["node", "vitest/globals"],
+    "types": ["node", "react", "vitest/globals"],
     "outDir": "dist"
   },
-  "include": ["src/**/*.ts", "src/**/*.d.ts", "tests/**/*.ts", "eslint.config.js", "tsup.config.ts", "vitest.config.ts"]
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "src/**/*.d.ts",
+    "tests/**/*.ts",
+    "tests/**/*.tsx",
+    "eslint.config.js",
+    "tsup.config.ts",
+    "vitest.config.ts"
+  ]
 }

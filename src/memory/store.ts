@@ -25,7 +25,7 @@ export interface SetCanonInput {
 }
 
 export class FileMemoryStore {
-  public constructor(private readonly projectRoot: string) {}
+  public constructor(public readonly projectRoot: string) {}
 
   public async getCanon(category: CanonCategory, name: string): Promise<CanonEntry | null> {
     const filePath = this.resolveCanonFilePath(category, name);

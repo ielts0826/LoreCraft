@@ -1,0 +1,20 @@
+node_modules/
+dist/
+.pnpm-store/
+coverage/
+*.log
+.DS_Store
+Thumbs.db
+
+# local project smoke tests / temp dirs
+tmp-smoke/
+.tmp/
+
+# editor / OS
+.idea/
+.vscode/
+
+# env and secrets
+.env
+.env.*
+!.env.example

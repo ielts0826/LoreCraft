@@ -181,6 +181,7 @@ Completed in this phase:
 - `/style analyze` with optional staged apply flow
 - project-local model binding plus user-local credential storage
 - `/model` view, bind, and connection test workflow
+- `/model` step-by-step wizard with role/provider dropdown selection
 - OpenAI-compatible provider for Kimi / GLM style endpoints
 - post-command project snapshot refresh in TUI
 

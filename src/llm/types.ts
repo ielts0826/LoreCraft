@@ -98,3 +98,9 @@ export interface SiliconFlowEmbeddingProviderOptions {
   baseUrl?: string | undefined;
   fetchImpl?: typeof fetch | undefined;
 }
+
+export interface OpenAICompatibleProviderOptions {
+  apiKey: string;
+  baseUrl: string;
+  fetchImpl?: typeof fetch | undefined;
+}

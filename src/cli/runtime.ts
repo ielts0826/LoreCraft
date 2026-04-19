@@ -6,21 +6,24 @@ import { KnowledgeExtractorAgent } from "../agents/extractor.js";
 import { OrchestratorAgent } from "../agents/orchestrator.js";
 import { ReviewerAgent } from "../agents/reviewer.js";
 import { WriterAgent } from "../agents/writer.js";
+import { CredentialStore } from "../core/credential-store.js";
 import { ProjectManager } from "../core/project.js";
 import { TransactionManager } from "../core/transaction.js";
 import { LLMClient } from "../llm/client.js";
 import { AnthropicProvider } from "../llm/providers/anthropic.js";
 import { SiliconFlowEmbeddingProvider } from "../llm/providers/embedding.js";
+import { OpenAICompatibleProvider } from "../llm/providers/openai-compatible.js";
 import { OpenRouterProvider } from "../llm/providers/openrouter.js";
 import { StoryIndexer } from "../memory/indexer.js";
 import { MentionTracker } from "../memory/mention-tracker.js";
 import { Retriever } from "../memory/retrieval.js";
 import { FileMemoryStore } from "../memory/store.js";
 import { Tokenizer } from "../memory/tokenizer.js";
-import type { ProjectConfig } from "../shared/types.js";
-import type { Project } from "../shared/types.js";
 import { ProjectError } from "../shared/errors.js";
 import { projectPath } from "../shared/constants.js";
+import type { ModelConfig, Project, ProjectConfig, TextModelRole } from "../shared/types.js";
+
+const TEXT_MODEL_ROLES = ["writer", "reviewer", "extractor", "light"] as const satisfies readonly TextModelRole[];
 
 export interface ProjectServices {
   project: Project;
@@ -42,16 +45,19 @@ export interface ProjectServices {
 export interface CommandRuntime {
   projectManager: ProjectManager;
   transactionManager: TransactionManager;
+  credentialStore: CredentialStore;
   createProjectServices(projectDir: string): Promise<ProjectServices>;
 }
 
 export function createCommandRuntime(
   projectManager = new ProjectManager(),
   transactionManager = new TransactionManager(),
+  credentialStore = new CredentialStore(),
 ): CommandRuntime {
   return {
     projectManager,
     transactionManager,
+    credentialStore,
     async createProjectServices(projectDir: string): Promise<ProjectServices> {
       const project = await projectManager.load(projectDir);
       const store = new FileMemoryStore(project.root);
@@ -64,7 +70,7 @@ export function createCommandRuntime(
       const indexer = new StoryIndexer(project.root, tokenizer);
       await indexer.reindexAll({ full: false, embeddingModelId: project.config.models.embedding.modelId });
       const retriever = new Retriever(indexer);
-      const llmClient = createLLMClientFromConfig(project.config);
+      const llmClient = await createLLMClientFromConfig(project.config, credentialStore);
       const contextBuilder = new ContextBuilder(store, retriever);
       const writerAgent = new WriterAgent(llmClient);
       const reviewerAgent = new ReviewerAgent(llmClient);
@@ -94,38 +100,17 @@ export function createCommandRuntime(
   };
 }
 
-export function createLLMClientFromConfig(config: ProjectConfig): LLMClient {
-  const providers = new Map<string, OpenRouterProvider | AnthropicProvider | SiliconFlowEmbeddingProvider>();
+export async function createLLMClientFromConfig(
+  config: ProjectConfig,
+  credentialStore = new CredentialStore(),
+): Promise<LLMClient> {
+  const providers = new Map<string, OpenRouterProvider | AnthropicProvider | SiliconFlowEmbeddingProvider | OpenAICompatibleProvider>();
 
-  const openRouterKey = resolveProviderApiKey(config, "openrouter");
-  if (openRouterKey) {
-    providers.set(
-      "openrouter",
-      new OpenRouterProvider({
-        apiKey: openRouterKey,
-      }),
-    );
+  for (const role of TEXT_MODEL_ROLES) {
+    await registerProviderForModel(providers, role, config.models[role], credentialStore);
   }
 
-  const anthropicKey = resolveProviderApiKey(config, "anthropic");
-  if (anthropicKey) {
-    providers.set(
-      "anthropic",
-      new AnthropicProvider({
-        apiKey: anthropicKey,
-      }),
-    );
-  }
-
-  const siliconflowKey = resolveProviderApiKey(config, "siliconflow");
-  if (siliconflowKey) {
-    providers.set(
-      "siliconflow",
-      new SiliconFlowEmbeddingProvider({
-        apiKey: siliconflowKey,
-      }),
-    );
-  }
+  await registerProviderForModel(providers, "embedding", config.models.embedding, credentialStore);
 
   return new LLMClient({
     providers: Object.fromEntries(providers),
@@ -134,14 +119,18 @@ export function createLLMClientFromConfig(config: ProjectConfig): LLMClient {
 
 export function selectModel(
   config: ProjectConfig,
-  key: "writer" | "reviewer" | "extractor" | "light",
+  key: TextModelRole,
   override?: { provider?: string | undefined; model?: string | undefined },
 ): { provider: string; model: string } {
   const base = config.models[key];
   return {
-    provider: override?.provider ?? base.provider,
+    provider: override?.provider ?? getProviderAlias(key),
     model: override?.model ?? base.modelId,
   };
+}
+
+export function getProviderAlias(role: TextModelRole | "embedding"): string {
+  return role;
 }
 
 export async function resolveChapterFile(projectRoot: string, chapterInput?: string): Promise<string> {
@@ -183,6 +172,82 @@ export function resolveWriteOutputPath(projectRoot: string, chapterId: string, v
   return path.join(volumeDir, fileName);
 }
 
+async function registerProviderForModel(
+  providers: Map<string, OpenRouterProvider | AnthropicProvider | SiliconFlowEmbeddingProvider | OpenAICompatibleProvider>,
+  alias: TextModelRole | "embedding",
+  model: ModelConfig,
+  credentialStore: CredentialStore,
+): Promise<void> {
+  const apiKey = await resolveModelApiKey(model, credentialStore);
+  if (!apiKey) {
+    return;
+  }
+
+  const provider = instantiateProvider(alias, model, apiKey);
+  providers.set(alias, provider);
+
+  if (!providers.has(model.provider)) {
+    providers.set(model.provider, provider);
+  }
+}
+
+function instantiateProvider(
+  alias: string,
+  model: ModelConfig,
+  apiKey: string,
+): OpenRouterProvider | AnthropicProvider | SiliconFlowEmbeddingProvider | OpenAICompatibleProvider {
+  switch (model.provider) {
+    case "openrouter":
+      return new OpenRouterProvider({
+        apiKey,
+        ...(model.baseUrl ? { baseUrl: model.baseUrl } : {}),
+      });
+
+    case "anthropic":
+      return new AnthropicProvider({
+        apiKey,
+        ...(model.baseUrl ? { baseUrl: model.baseUrl } : {}),
+      });
+
+    case "openai-compatible":
+      if (!model.baseUrl) {
+        throw new ProjectError(`模型别名 ${alias} 缺少 baseUrl，无法使用 openai-compatible provider。`);
+      }
+
+      return new OpenAICompatibleProvider(alias, {
+        apiKey,
+        baseUrl: model.baseUrl,
+      });
+
+    case "siliconflow":
+      return new SiliconFlowEmbeddingProvider({
+        apiKey,
+        ...(model.baseUrl ? { baseUrl: model.baseUrl } : {}),
+      });
+
+    default:
+      throw new ProjectError(`不支持的模型供应商: ${model.provider}`);
+  }
+}
+
+async function resolveModelApiKey(model: ModelConfig, credentialStore: CredentialStore): Promise<string | null> {
+  if (model.credentialId) {
+    const credential = await credentialStore.get(model.credentialId);
+    if (credential) {
+      return credential;
+    }
+  }
+
+  if (model.apiKeyEnv) {
+    const value = process.env[model.apiKeyEnv];
+    if (value) {
+      return value;
+    }
+  }
+
+  return null;
+}
+
 async function walkMarkdownFiles(root: string): Promise<string[]> {
   try {
     const entries = await fs.readdir(root, { withFileTypes: true });
@@ -213,20 +278,4 @@ function normalizeChapterId(input: string): string {
   }
 
   return `ch${digits.padStart(3, "0")}`;
-}
-
-function resolveProviderApiKey(config: ProjectConfig, provider: string): string | null {
-  const models = [config.models.writer, config.models.reviewer, config.models.extractor, config.models.light, config.models.embedding];
-  for (const model of models) {
-    if (model.provider !== provider || !model.apiKeyEnv) {
-      continue;
-    }
-
-    const value = process.env[model.apiKeyEnv];
-    if (value) {
-      return value;
-    }
-  }
-
-  return null;
 }

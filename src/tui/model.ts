@@ -3,8 +3,8 @@ import path from "node:path";
 
 import { ProjectManager } from "../core/project.js";
 import { PATHS, projectPath } from "../shared/constants.js";
-import { exists, readJsonIfExists, readTextIfExists } from "../shared/utils.js";
 import type { Manifest, ProjectStatus } from "../shared/types.js";
+import { exists, readJsonIfExists, readTextIfExists } from "../shared/utils.js";
 
 export type TuiViewId = "dashboard" | "chat" | "memory" | "outline" | "tasks" | "conflicts" | "confirm" | "diff";
 
@@ -125,7 +125,7 @@ export function buildTaskItems(snapshot: ProjectSnapshot, messages: CommandMessa
       },
       {
         title: "加载项目目录",
-        detail: "或用 `lorecraft tui -d <项目路径>` 进入已有项目。",
+        detail: "或者用 `lorecraft tui -d <项目路径>` 进入已有项目。",
         tone: "neutral",
       },
     ];
@@ -151,7 +151,7 @@ export function buildTaskItems(snapshot: ProjectSnapshot, messages: CommandMessa
   if (snapshot.pendingTransactions.length > 0) {
     items.push({
       title: "处理待确认事务",
-      detail: `当前有 ${snapshot.pendingTransactions.length} 个待处理事务，可用 /diff、/commit、/rollback。`,
+      detail: `当前有 ${snapshot.pendingTransactions.length} 个事务待处理，可用 /diff、/commit、/rollback。`,
       tone: "danger",
     });
   }
@@ -159,7 +159,7 @@ export function buildTaskItems(snapshot: ProjectSnapshot, messages: CommandMessa
   if (snapshot.status.pendingConfirmations > 0) {
     items.push({
       title: "处理待确认项",
-      detail: `审校或抽取留下 ${snapshot.status.pendingConfirmations} 条待确认记录。`,
+      detail: `审校或抽取留下了 ${snapshot.status.pendingConfirmations} 条待确认记录。`,
       tone: "danger",
     });
   }
@@ -175,7 +175,7 @@ export function buildTaskItems(snapshot: ProjectSnapshot, messages: CommandMessa
   if (items.length === 0) {
     items.push({
       title: "项目状态平稳",
-      detail: "当前没有明显阻塞，可以直接输入 /write、/lookup 或 /plan。",
+      detail: "当前没有明显阻塞，可以直接输入 /write、/lookup、/plan 或 /model。",
       tone: "success",
     });
   }
@@ -184,7 +184,7 @@ export function buildTaskItems(snapshot: ProjectSnapshot, messages: CommandMessa
 }
 
 function buildCommandHints(status: ProjectStatus): string[] {
-  const hints = ["/help", "/status", "/lookup 主角", "/history"];
+  const hints = ["/help", "/status", "/lookup 主角", "/model", "/history"];
 
   if (status.totalChaptersPlanned > 0) {
     hints.push(`/write ch${String(Math.max(status.currentChapter, 1)).padStart(3, "0")}`);

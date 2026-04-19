@@ -5,6 +5,9 @@ export default defineConfig({
   format: ["esm"],
   target: "node22",
   platform: "node",
+  banner: {
+    js: "#!/usr/bin/env node",
+  },
   sourcemap: true,
   clean: true,
   dts: false,

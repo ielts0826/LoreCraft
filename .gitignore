@@ -18,3 +18,7 @@ tmp-smoke/
 .env
 .env.*
 !.env.example
+
+# local planning docs
+*.txt
+!PHASE_TRACKER.txt

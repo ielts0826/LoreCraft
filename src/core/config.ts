@@ -11,6 +11,7 @@ const modelConfigSchema = z.object({
   provider: z.string().min(1),
   modelId: z.string().min(1),
   apiKeyEnv: z.string().min(1).optional(),
+  credentialId: z.string().min(1).optional(),
   baseUrl: z.string().url().optional(),
 });
 
@@ -50,27 +51,32 @@ export function createDefaultConfig(projectName: string, genre = "general"): Pro
       writer: {
         provider: "openrouter",
         modelId: "anthropic/claude-sonnet-4-5",
+        credentialId: "default-openrouter",
         apiKeyEnv: "OPENROUTER_API_KEY",
       },
       reviewer: {
         provider: "openrouter",
         modelId: "google/gemini-2.5-flash",
+        credentialId: "default-openrouter",
         apiKeyEnv: "OPENROUTER_API_KEY",
       },
       extractor: {
         provider: "openrouter",
         modelId: "google/gemini-2.5-flash",
+        credentialId: "default-openrouter",
         apiKeyEnv: "OPENROUTER_API_KEY",
       },
       light: {
         provider: "openrouter",
         modelId: "google/gemini-2.5-flash",
+        credentialId: "default-openrouter",
         apiKeyEnv: "OPENROUTER_API_KEY",
       },
       embedding: {
         provider: "siliconflow",
         modelId: "BAAI/bge-m3",
         dimension: 1024,
+        credentialId: "default-siliconflow",
         apiKeyEnv: "SILICONFLOW_API_KEY",
       },
     },

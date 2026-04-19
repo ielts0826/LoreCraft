@@ -135,11 +135,16 @@ In Progress
 - Phase 8 - Hardening and Optimization
 Added files:
 - src/cli/workflows.ts
+- src/cli/model-workflows.ts
+- src/core/credential-store.ts
 - src/tui/commands.ts
 - src/tui/components/command-palette.tsx
+- src/llm/providers/openai-compatible.ts
 - tests/tui/commands.test.ts
+- tests/core/credential-store.test.ts
 Updated existing files:
 - src/main.ts
+- .gitignore
 - src/cli/commands/init.ts
 - src/cli/commands/status.ts
 - src/cli/commands/lookup.ts
@@ -147,8 +152,12 @@ Updated existing files:
 - src/cli/commands/write.ts
 - src/cli/commands/plan.ts
 - src/cli/commands/expand.ts
+- src/cli/runtime.ts
+- src/core/config.ts
+- src/core/project.ts
 - src/core/transaction.ts
 - src/llm/prompts/style-analyzer.ts
+- src/llm/types.ts
 - src/tui/app.tsx
 - src/tui/model.ts
 - src/tui/theme.ts
@@ -170,6 +179,9 @@ Completed in this phase:
 - TUI execution for `/write /check /plan /expand`
 - `/history /diff /commit /rollback` transaction workflow
 - `/style analyze` with optional staged apply flow
+- project-local model binding plus user-local credential storage
+- `/model` view, bind, and connection test workflow
+- OpenAI-compatible provider for Kimi / GLM style endpoints
 - post-command project snapshot refresh in TUI
 
 Pending Phases

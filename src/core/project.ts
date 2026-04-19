@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import YAML from "yaml";
 
 import { DEFAULT_TEXT_FILES, PROJECT_DIRECTORIES, projectPath } from "../shared/constants.js";
 import type { ProjectPathKey } from "../shared/constants.js";
@@ -207,21 +208,5 @@ async function countMarkdownFiles(directory: string): Promise<number> {
 }
 
 function formatConfigYaml(config: Project["config"]): string {
-  return [
-    "schemaVersion: 1",
-    `name: ${JSON.stringify(config.name)}`,
-    `genre: ${JSON.stringify(config.genre)}`,
-    `creativeMode: ${config.creativeMode}`,
-    "models:",
-    `  writer:\n    provider: ${config.models.writer.provider}\n    modelId: ${config.models.writer.modelId}\n    apiKeyEnv: ${config.models.writer.apiKeyEnv ?? "OPENROUTER_API_KEY"}`,
-    `  reviewer:\n    provider: ${config.models.reviewer.provider}\n    modelId: ${config.models.reviewer.modelId}\n    apiKeyEnv: ${config.models.reviewer.apiKeyEnv ?? "OPENROUTER_API_KEY"}`,
-    `  extractor:\n    provider: ${config.models.extractor.provider}\n    modelId: ${config.models.extractor.modelId}\n    apiKeyEnv: ${config.models.extractor.apiKeyEnv ?? "OPENROUTER_API_KEY"}`,
-    `  light:\n    provider: ${config.models.light.provider}\n    modelId: ${config.models.light.modelId}\n    apiKeyEnv: ${config.models.light.apiKeyEnv ?? "OPENROUTER_API_KEY"}`,
-    `  embedding:\n    provider: ${config.models.embedding.provider}\n    modelId: ${config.models.embedding.modelId}\n    dimension: ${config.models.embedding.dimension}\n    apiKeyEnv: ${config.models.embedding.apiKeyEnv ?? "SILICONFLOW_API_KEY"}`,
-    "style: {}",
-    "sandbox:",
-    `  mode: ${config.sandbox.mode}`,
-    `  allowNetwork: ${config.sandbox.allowNetwork}`,
-    "",
-  ].join("\n");
+  return YAML.stringify(config);
 }

@@ -18,8 +18,9 @@ describe("tui command palette", () => {
   });
 
   it("supports nested slash commands", () => {
-    const commands = filterTuiCommands("/style");
-    expect(commands.some((command) => command.name === "/style analyze")).toBe(true);
+    const commands = filterTuiCommands("/model");
+    expect(commands.some((command) => command.name === "/model set")).toBe(true);
+    expect(commands.some((command) => command.name === "/model test")).toBe(true);
   });
 
   it("autocompletes when command requires arguments", () => {

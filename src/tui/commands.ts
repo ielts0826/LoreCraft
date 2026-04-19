@@ -17,7 +17,9 @@ import {
   rollbackTransaction,
   writeChapter,
 } from "../cli/workflows.js";
+import { getModelConfigurationSummary, setModelBinding, testModelConnection } from "../cli/model-workflows.js";
 import { ProjectManager } from "../core/project.js";
+import type { TextModelRole } from "../shared/types.js";
 import { viewOrder, type ProjectSnapshot, type TuiViewId } from "./model.js";
 
 export interface TuiCommandSpec {
@@ -46,6 +48,7 @@ export interface TuiCommandExecutionResult {
 
 const defaultRuntime = createCommandRuntime();
 const defaultProjectManager = new ProjectManager();
+const modelRoles: readonly TextModelRole[] = ["writer", "reviewer", "extractor", "light"];
 
 export const tuiCommandSpecs: readonly TuiCommandSpec[] = [
   {
@@ -89,7 +92,7 @@ export const tuiCommandSpecs: readonly TuiCommandSpec[] = [
     name: "/plan",
     synopsis: "/plan <故事点子>",
     description: "生成最小可行的大纲规划",
-    template: "/plan 一个关于王朝崩塌的故事",
+    template: "/plan 一个王朝崩塌后的悬疑修仙故事",
     keywords: ["outline", "idea"],
     requiresArguments: true,
   },
@@ -104,9 +107,32 @@ export const tuiCommandSpecs: readonly TuiCommandSpec[] = [
   {
     name: "/style analyze",
     synopsis: "/style analyze <referenceFile> [--apply]",
-    description: "分析参考文风，并可选择生成待确认的风格事务",
+    description: "分析参考文风，并可生成待确认的风格事务",
     template: "/style analyze manuscript/volumes/vol_01/ch_001.md",
-    keywords: ["style", "analyze", "voice"],
+    keywords: ["style", "voice", "analyze"],
+    requiresArguments: true,
+  },
+  {
+    name: "/model",
+    synopsis: "/model",
+    description: "查看当前项目的角色模型绑定和配置方式",
+    template: "/model",
+    keywords: ["provider", "model", "key", "base-url"],
+  },
+  {
+    name: "/model set",
+    synopsis: "/model set <role> <provider> <modelId> [--base-url URL] [--api-key KEY] [--credential ID] [--test]",
+    description: "为 writer/reviewer/extractor/light 绑定模型连接",
+    template: "/model set writer openai-compatible moonshot-v1-8k --base-url https://api.moonshot.cn/v1 --api-key <key> --test",
+    keywords: ["provider", "model", "api", "bind", "kimi", "glm"],
+    requiresArguments: true,
+  },
+  {
+    name: "/model test",
+    synopsis: "/model test <role>",
+    description: "测试某个角色当前模型连接是否可用",
+    template: "/model test writer",
+    keywords: ["provider", "model", "ping", "connection"],
     requiresArguments: true,
   },
   {
@@ -540,17 +566,75 @@ export async function executeTuiInput(
       );
 
       return {
-        title: result.transactionId ? "风格分析已暂存" : "风格分析结果",
+        title: result.transactionId ? "文风分析已暂存" : "文风分析结果",
         body: result.transactionId
           ? [
               result.analysis,
               "",
               `已生成待确认事务：${result.transactionId}`,
-              `涉及文件：${result.stagedFiles.join("，")}`,
+              `涉及文件：${result.stagedFiles.join("、")}`,
               "可继续执行 /diff 查看差异，或 /commit 提交。",
             ].join("\n")
           : result.analysis,
         nextView: result.transactionId ? "confirm" : "memory",
+      };
+    }
+
+    case "/model": {
+      assertProjectLoaded(snapshot);
+      return {
+        title: "模型绑定",
+        body: await getModelConfigurationSummary(projectDir, projectManager, runtime.credentialStore),
+        nextView: "chat",
+      };
+    }
+
+    case "/model set": {
+      assertProjectLoaded(snapshot);
+      const role = positionals[0] as TextModelRole | undefined;
+      const provider = positionals[1];
+      const modelId = positionals[2];
+      if (!role || !modelRoles.includes(role) || !provider || !modelId) {
+        return {
+          title: "命令缺参数",
+          body: "用法：/model set <writer|reviewer|extractor|light> <provider> <modelId> [--base-url URL] [--api-key KEY] [--credential ID] [--test]",
+        };
+      }
+
+      return {
+        title: "模型已更新",
+        body: await setModelBinding(
+          projectDir,
+          role,
+          {
+            provider,
+            modelId,
+            baseUrl: readStringFlag(flags["base-url"]),
+            apiKey: readStringFlag(flags["api-key"]),
+            credentialId: readStringFlag(flags.credential),
+            test: flags.test === true,
+          },
+          projectManager,
+          runtime.credentialStore,
+        ),
+        nextView: "chat",
+      };
+    }
+
+    case "/model test": {
+      assertProjectLoaded(snapshot);
+      const role = positionals[0] as TextModelRole | undefined;
+      if (!role || !modelRoles.includes(role)) {
+        return {
+          title: "命令缺参数",
+          body: "用法：/model test <writer|reviewer|extractor|light>",
+        };
+      }
+
+      return {
+        title: "连接测试",
+        body: await testModelConnection(projectDir, role, projectManager, runtime.credentialStore),
+        nextView: "chat",
       };
     }
 

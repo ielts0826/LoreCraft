@@ -6,8 +6,11 @@ export interface ModelConfig {
   provider: string;
   modelId: string;
   apiKeyEnv?: string | undefined;
+  credentialId?: string | undefined;
   baseUrl?: string | undefined;
 }
+
+export type TextModelRole = "writer" | "reviewer" | "extractor" | "light";
 
 export interface EmbeddingModelConfig extends ModelConfig {
   provider: "siliconflow";

@@ -18,6 +18,7 @@
     "node": ">=22.0.0"
   },
   "dependencies": {
+    "@node-rs/jieba": "^2.0.1",
     "commander": "^13.1.0",
     "write-file-atomic": "^6.0.0",
     "yaml": "^2.8.1",

@@ -13,7 +13,7 @@ Phase Summary
 - Phase 3 - LLM Layer: DONE
 - Phase 4 - Prompt Layer: DONE
 - Phase 5 - Agent Layer: DONE
-- Phase 6 - Command Layer Expansion: TODO
+- Phase 6 - Command Layer Expansion: DONE
 - Phase 7 - TUI Layer: TODO
 - Phase 8 - Hardening and Optimization: TODO
 
@@ -93,34 +93,22 @@ Added files:
 - tests/agents/context-builder.test.ts
 - tests/agents/workflow.test.ts
 
-In Progress
-
-- No active phase at the moment. Next recommended target: Phase 6 - Command Layer Expansion.
-
-Pending Phases
-
 Phase 6 - Command Layer Expansion
-Planned files:
+Added files:
+- src/cli/runtime.ts
+- src/cli/commands/lookup.ts
+- src/cli/commands/check.ts
+- src/cli/commands/write.ts
 - src/cli/commands/plan.ts
 - src/cli/commands/expand.ts
-- src/cli/commands/outline.ts
-- src/cli/commands/restructure.ts
-- src/cli/commands/write.ts
-- src/cli/commands/continue.ts
-- src/cli/commands/rewrite.ts
-- src/cli/commands/check.ts
-- src/cli/commands/diff.ts
-- src/cli/commands/commit.ts
-- src/cli/commands/rollback.ts
-- src/cli/commands/history.ts
-- src/cli/commands/lookup.ts
-- src/cli/commands/remember.ts
-- src/cli/commands/reindex.ts
-- src/cli/commands/timeline.ts
-- src/cli/commands/characters.ts
-- src/cli/commands/style.ts
-- src/cli/commands/config.ts
-- src/cli/commands/export.ts
+- src/shared/node-sqlite.ts
+- tests/cli/commands.test.ts
+
+In Progress
+
+- No active phase at the moment. Next recommended target: Phase 7 - TUI Layer.
+
+Pending Phases
 
 Phase 7 - TUI Layer
 Planned files:

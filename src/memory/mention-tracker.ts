@@ -1,11 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
-import { DatabaseSync } from "node:sqlite";
-import type { SQLInputValue } from "node:sqlite";
 
 import { mentionRecordSchema, type MentionRecord, type MentionType } from "./schema.js";
+import { DatabaseSync, type SQLInputValue } from "../shared/node-sqlite.js";
 
-type SqliteDatabase = DatabaseSync;
+type SqliteDatabase = InstanceType<typeof DatabaseSync>;
 
 export interface MentionFilter {
   entityType?: MentionType;

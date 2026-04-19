@@ -1,14 +1,13 @@
 import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
-import { DatabaseSync } from "node:sqlite";
-import type { SQLInputValue } from "node:sqlite";
 
 import { PATHS } from "../shared/constants.js";
+import { DatabaseSync, type SQLInputValue } from "../shared/node-sqlite.js";
 import { readTextIfExists, sha256 } from "../shared/utils.js";
 import type { Tokenizer } from "./tokenizer.js";
 
-type SqliteDatabase = DatabaseSync;
+type SqliteDatabase = InstanceType<typeof DatabaseSync>;
 
 export type MemoryLayer = "canon" | "outline" | "continuity" | "manuscript";
 

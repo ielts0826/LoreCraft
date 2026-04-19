@@ -15,7 +15,7 @@ Phase Summary
 - Phase 5 - Agent Layer: DONE
 - Phase 6 - Command Layer Expansion: DONE
 - Phase 7 - TUI Layer: DONE
-- Phase 8 - Hardening and Optimization: TODO
+- Phase 8 - Hardening and Optimization: IN PROGRESS
 
 Completed Work
 
@@ -132,12 +132,32 @@ Updated existing files:
 
 In Progress
 
-- No active phase at the moment. Next recommended target: Phase 8 - Hardening and Optimization.
+- Phase 8 - Hardening and Optimization
+Added files:
+- src/cli/workflows.ts
+- src/tui/commands.ts
+- src/tui/components/command-palette.tsx
+- tests/tui/commands.test.ts
+Updated existing files:
+- src/main.ts
+- src/cli/commands/init.ts
+- src/cli/commands/status.ts
+- src/cli/commands/lookup.ts
+- src/cli/commands/check.ts
+- src/cli/commands/write.ts
+- src/cli/commands/plan.ts
+- src/cli/commands/expand.ts
+- src/tui/app.tsx
+- src/tui/hooks/use-agent.ts
+- src/tui/components/input.tsx
 
 Pending Phases
 
 Phase 8 - Hardening and Optimization
 Planned areas:
+- slash command dropdown and autocompletion
+- default `lorecraft` startup into TUI
+- TUI execution for `/write /check /plan /expand`
 - richer `/style analyze`
 - `/expand` diff quality
 - sparse retrieval integration

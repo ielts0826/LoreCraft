@@ -1,9 +1,9 @@
 import path from "node:path";
 import { Command } from "commander";
 
-import { ProjectManager } from "../../core/project.js";
+import { initializeProject } from "../workflows.js";
 
-export function createInitCommand(projectManager = new ProjectManager()): Command {
+export function createInitCommand(): Command {
   return new Command("init")
     .description("初始化新的 LoreCraft 项目")
     .argument("<name>", "项目名称")
@@ -11,7 +11,7 @@ export function createInitCommand(projectManager = new ProjectManager()): Comman
     .option("--genre <genre>", "项目类型", "general")
     .option("--in-place", "在指定目录直接初始化", false)
     .action(async (name: string, options: { directory: string; genre: string; inPlace: boolean }) => {
-      const project = await projectManager.create(name, {
+      const project = await initializeProject(name, {
         baseDir: path.resolve(options.directory),
         genre: options.genre,
         inPlace: options.inPlace,

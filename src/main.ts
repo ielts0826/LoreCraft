@@ -1,3 +1,10 @@
-import { createCli } from "./cli/index.js";
+import path from "node:path";
 
-await createCli().parseAsync(process.argv);
+import { createCli } from "./cli/index.js";
+import { launchTui } from "./tui/app.js";
+
+if (process.argv.length <= 2) {
+  await launchTui({ directory: path.resolve(process.cwd()) });
+} else {
+  await createCli().parseAsync(process.argv);
+}

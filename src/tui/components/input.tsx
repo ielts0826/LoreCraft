@@ -15,14 +15,13 @@ export function CommandInput({
 
   return (
     <Box flexDirection="row" alignItems="center">
-      <Text color={tuiTheme.blue}>{focused ? "▎" : " "}</Text>
+      <Text color={tuiTheme.blue}>{focused ? "|" : " "}</Text>
       <Box flexGrow={1} borderStyle="single" borderColor={tuiTheme.border} paddingX={1}>
         <Text color={value.length > 0 ? tuiTheme.text : tuiTheme.muted}>
           {displayValue}
-          {focused ? "█" : ""}
+          {focused ? "_" : ""}
         </Text>
       </Box>
     </Box>
   );
 }
-

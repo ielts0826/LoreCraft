@@ -16,4 +16,3 @@ export function TasksView({ tasks }: { tasks: TaskItem[] }) {
     </Panel>
   );
 }
-

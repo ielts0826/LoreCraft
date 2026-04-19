@@ -17,6 +17,11 @@ describe("tui command palette", () => {
     expect(commands.some((command) => command.name === "/write")).toBe(true);
   });
 
+  it("supports nested slash commands", () => {
+    const commands = filterTuiCommands("/style");
+    expect(commands.some((command) => command.name === "/style analyze")).toBe(true);
+  });
+
   it("autocompletes when command requires arguments", () => {
     const writeCommand = filterTuiCommands("/write")[0];
     const statusCommand = filterTuiCommands("/status")[0];

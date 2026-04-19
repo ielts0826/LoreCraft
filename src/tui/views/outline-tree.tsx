@@ -8,13 +8,13 @@ import { tuiTheme } from "../theme.js";
 export function OutlineTreeView({ snapshot }: { snapshot: ProjectSnapshot | null }) {
   const items: ScrollListItem[] =
     snapshot?.outlineNodes.map((node) => ({
-      label: `${node.kind === "volume" ? "◆" : "└"} ${node.label}`,
+      label: `${node.kind === "volume" ? "[V]" : "[C]"} ${node.label}`,
       tone: node.kind === "volume" ? "success" : "muted",
     })) ?? [];
 
   return (
     <Panel title="大纲树">
-      {items.length > 0 ? <ScrollList items={items} maxItems={14} /> : <Text color={tuiTheme.muted}>还没有卷纲或章节简报。</Text>}
+      {items.length > 0 ? <ScrollList items={items} maxItems={14} /> : <Text color={tuiTheme.muted}>还没有卷级或章节简报。</Text>}
     </Panel>
   );
 }

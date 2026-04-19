@@ -2,13 +2,19 @@ import path from "node:path";
 
 import { createCommandRuntime } from "../cli/runtime.js";
 import {
+  analyzeStyle,
+  commitTransaction,
   expandOutline,
   formatReviewReport,
+  formatTransactionHistory,
   getProjectStatus,
+  getTransactionDiff,
   initializeProject,
+  listTransactions,
   lookupKnowledge,
   planStory,
   reviewChapter,
+  rollbackTransaction,
   writeChapter,
 } from "../cli/workflows.js";
 import { ProjectManager } from "../core/project.js";
@@ -94,6 +100,42 @@ export const tuiCommandSpecs: readonly TuiCommandSpec[] = [
     template: "/expand story_bible/outlines/volume_plans/vol01.md",
     keywords: ["outline", "volume"],
     requiresArguments: true,
+  },
+  {
+    name: "/style analyze",
+    synopsis: "/style analyze <referenceFile> [--apply]",
+    description: "分析参考文风，并可选择生成待确认的风格事务",
+    template: "/style analyze manuscript/volumes/vol_01/ch_001.md",
+    keywords: ["style", "analyze", "voice"],
+    requiresArguments: true,
+  },
+  {
+    name: "/history",
+    synopsis: "/history",
+    description: "列出最近的事务记录",
+    template: "/history",
+    keywords: ["transaction", "timeline"],
+  },
+  {
+    name: "/diff",
+    synopsis: "/diff [txnId]",
+    description: "查看某个事务的差异预览",
+    template: "/diff",
+    keywords: ["transaction", "preview"],
+  },
+  {
+    name: "/commit",
+    synopsis: "/commit [txnId]",
+    description: "提交事务",
+    template: "/commit",
+    keywords: ["transaction", "apply"],
+  },
+  {
+    name: "/rollback",
+    synopsis: "/rollback [txnId]",
+    description: "回滚事务",
+    template: "/rollback",
+    keywords: ["transaction", "cancel"],
   },
   {
     name: "/view",
@@ -207,16 +249,16 @@ export function shouldAutocompleteCommandInput(input: string, selected: TuiComma
   }
 
   const tokens = tokenizeCommandLine(trimmed);
-  const currentCommand = tokens[0]?.toLowerCase();
-  if (currentCommand !== selected.name) {
+  const currentCommand = tokens.slice(0, Math.min(tokens.length, 2)).join(" ").toLowerCase();
+  if (currentCommand !== selected.name && tokens[0]?.toLowerCase() !== selected.name) {
     return true;
   }
 
-  if (selected.requiresArguments && tokens.length === 1) {
+  if (selected.requiresArguments && tokens.length <= selected.name.split(" ").length) {
     return true;
   }
 
-  return trimmed !== selected.template && tokens.length === 1;
+  return trimmed !== selected.template && tokens.length <= selected.name.split(" ").length;
 }
 
 export async function executeTuiInput(
@@ -265,10 +307,10 @@ export async function executeTuiInput(
   }
 
   const tokens = tokenizeCommandLine(trimmed);
-  const command = tokens[0]?.toLowerCase() ?? "";
-  const { positionals, flags } = parseOptionTokens(tokens.slice(1));
+  const command = detectCommand(tokens);
+  const { positionals, flags } = parseOptionTokens(tokens.slice(command.tokenCount));
 
-  switch (command) {
+  switch (command.name) {
     case "/help":
       return {
         title: "命令手册",
@@ -369,12 +411,7 @@ export async function executeTuiInput(
         };
       }
 
-      const output = await lookupKnowledge(
-        projectDir,
-        query,
-        { limit: readNumericFlag(flags.limit, 5) },
-        runtime,
-      );
+      const output = await lookupKnowledge(projectDir, query, { limit: readNumericFlag(flags.limit, 5) }, runtime);
       return {
         title: "检索结果",
         body: output,
@@ -481,17 +518,102 @@ export async function executeTuiInput(
       };
     }
 
+    case "/style analyze": {
+      assertProjectLoaded(snapshot);
+      const referenceFile = positionals[0];
+      if (!referenceFile) {
+        return {
+          title: "命令缺参数",
+          body: "用法：/style analyze <referenceFile> [--apply]",
+        };
+      }
+
+      const result = await analyzeStyle(
+        projectDir,
+        referenceFile,
+        {
+          apply: flags.apply === true,
+          provider: readStringFlag(flags.provider),
+          model: readStringFlag(flags.model),
+        },
+        runtime,
+      );
+
+      return {
+        title: result.transactionId ? "风格分析已暂存" : "风格分析结果",
+        body: result.transactionId
+          ? [
+              result.analysis,
+              "",
+              `已生成待确认事务：${result.transactionId}`,
+              `涉及文件：${result.stagedFiles.join("，")}`,
+              "可继续执行 /diff 查看差异，或 /commit 提交。",
+            ].join("\n")
+          : result.analysis,
+        nextView: result.transactionId ? "confirm" : "memory",
+      };
+    }
+
+    case "/history": {
+      assertProjectLoaded(snapshot);
+      const records = await listTransactions(projectDir, { includeClosed: true });
+      return {
+        title: "事务历史",
+        body: formatTransactionHistory(records),
+        nextView: "diff",
+      };
+    }
+
+    case "/diff": {
+      assertProjectLoaded(snapshot);
+      const result = await getTransactionDiff(projectDir, positionals[0]);
+      return {
+        title: "事务差异",
+        body: result.formatted,
+        nextView: "diff",
+      };
+    }
+
+    case "/commit": {
+      assertProjectLoaded(snapshot);
+      const message = await commitTransaction(projectDir, positionals[0]);
+      return {
+        title: "事务已提交",
+        body: message,
+        nextView: "confirm",
+      };
+    }
+
+    case "/rollback": {
+      assertProjectLoaded(snapshot);
+      const message = await rollbackTransaction(projectDir, positionals[0]);
+      return {
+        title: "事务已回滚",
+        body: message,
+        nextView: "confirm",
+      };
+    }
+
     default:
       return {
         title: "未知命令",
         body: [
-          `未识别命令：${command}`,
+          `未识别命令：${command.name}`,
           "",
           "可用命令：",
           ...tuiCommandSpecs.map((item) => `- ${item.synopsis}`),
         ].join("\n"),
       };
   }
+}
+
+function detectCommand(tokens: string[]): { name: string; tokenCount: number } {
+  const twoToken = tokens.slice(0, 2).join(" ").toLowerCase();
+  if (tuiCommandSpecs.some((command) => command.name === twoToken)) {
+    return { name: twoToken, tokenCount: 2 };
+  }
+
+  return { name: tokens[0]?.toLowerCase() ?? "", tokenCount: 1 };
 }
 
 function parseOptionTokens(tokens: string[]): {

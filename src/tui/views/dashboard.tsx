@@ -1,10 +1,10 @@
-import { Box, Text } from "ink";
+import { Box } from "ink";
 
 import { Markdown } from "../components/markdown.js";
 import { Panel } from "../components/panel.js";
 import { ScrollList } from "../components/scroll-list.js";
 import type { ProjectSnapshot, TaskItem } from "../model.js";
-import { splashSubtitle, splashTitle, tuiTheme } from "../theme.js";
+import { splashSubtitle, splashTitle } from "../theme.js";
 
 export function DashboardView({
   snapshot,
@@ -28,10 +28,7 @@ export function DashboardView({
   return (
     <Box flexDirection="column" flexGrow={1}>
       <Box flexDirection="column" alignItems="center" marginBottom={1}>
-        <Text color={tuiTheme.gold} bold>
-          {splashTitle}
-        </Text>
-        <Text color={tuiTheme.muted}>{splashSubtitle}</Text>
+        <Markdown content={`# ${splashTitle}\n${splashSubtitle}`} />
       </Box>
 
       <Box flexDirection={stacked ? "column" : "row"} gap={1}>
@@ -42,7 +39,7 @@ export function DashboardView({
                 `## ${snapshot?.name ?? "未加载项目"}`,
                 `- 目录：${snapshot?.directory ?? "-"}`,
                 `- 类型：${snapshot?.genre ?? "-"}`,
-                `- 说明：${snapshot?.problem ?? "项目已加载，可直接开始工作。"}`
+                `- 说明：${snapshot?.problem ?? "项目已加载，可以直接开始工作。"}`,
               ].join("\n")}
             />
           </Panel>
@@ -77,4 +74,3 @@ export function DashboardView({
     </Box>
   );
 }
-

@@ -3,9 +3,13 @@ import path from "node:path";
 
 import type { ReviewReport } from "../agents/reviewer.js";
 import { ProjectManager } from "../core/project.js";
+import { TransactionManager, type TransactionState } from "../core/transaction.js";
 import { buildExpandPlannerPrompt } from "../llm/prompts/expand-planner.js";
+import { buildStyleAnalyzerPrompt } from "../llm/prompts/style-analyzer.js";
+import { PATHS, projectPath } from "../shared/constants.js";
 import { ProjectError } from "../shared/errors.js";
-import type { Project } from "../shared/types.js";
+import type { DiffResult, Manifest, Project } from "../shared/types.js";
+import { exists, readJsonIfExists } from "../shared/utils.js";
 import { createCommandRuntime, resolveChapterBrief, resolveChapterFile, resolveWriteOutputPath, selectModel } from "./runtime.js";
 
 export interface WorkflowModelOverride {
@@ -29,6 +33,10 @@ export interface WriteWorkflowOptions extends WorkflowModelOverride {
   volume?: string | undefined;
 }
 
+export interface StyleAnalyzeWorkflowOptions extends WorkflowModelOverride {
+  apply?: boolean | undefined;
+}
+
 export interface WriteWorkflowResult {
   outputPath: string;
   content: string;
@@ -38,6 +46,27 @@ export interface StatusWorkflowResult {
   name: string;
   root: string;
   summary: string;
+}
+
+export interface StyleAnalyzeWorkflowResult {
+  analysis: string;
+  transactionId?: string | undefined;
+  stagedFiles: string[];
+}
+
+export interface TransactionRecord {
+  id: string;
+  state: TransactionState;
+  description: string;
+  updatedAt: string;
+  operationCount: number;
+  targets: string[];
+}
+
+export interface TransactionDiffWorkflowResult {
+  record: TransactionRecord;
+  formatted: string;
+  diffs: DiffResult[];
 }
 
 export async function initializeProject(
@@ -267,6 +296,164 @@ export async function expandOutline(
   }
 }
 
+export async function analyzeStyle(
+  directory: string,
+  referenceFile: string,
+  options: StyleAnalyzeWorkflowOptions = {},
+  runtime = createCommandRuntime(),
+): Promise<StyleAnalyzeWorkflowResult> {
+  const services = await runtime.createProjectServices(path.resolve(directory));
+  try {
+    const referencePath = path.resolve(services.project.root, referenceFile);
+    const referenceText = await fs.readFile(referencePath, "utf8");
+    const existingStyle = await services.store.getStyle();
+    const existingStyleText = [existingStyle.proseStyle, existingStyle.povRules, existingStyle.tabooList]
+      .filter(Boolean)
+      .join("\n\n");
+    const modelSelection = selectModel(services.project.config, "light", options);
+
+    const response = await services.llmClient.generate({
+      provider: modelSelection.provider,
+      model: modelSelection.model,
+      temperature: 0.2,
+      maxTokens: 2_500,
+      messages: [
+        {
+          role: "system",
+          content: buildStyleAnalyzerPrompt({
+            referenceText,
+            existingStyle: existingStyleText,
+          }),
+        },
+        {
+          role: "user",
+          content: `请分析参考文件 ${path.basename(referencePath)} 的文风，并整理成可执行的风格规格卡。`,
+        },
+      ],
+    });
+
+    const analysis = response.content.trim();
+    if (!options.apply) {
+      return {
+        analysis,
+        stagedFiles: [],
+      };
+    }
+
+    const styleBundle = parseStyleBundle(analysis, existingStyle);
+    const tx = await services.transactionManager.begin(
+      services.project.root,
+      `Apply style analysis from ${path.basename(referencePath)}`,
+    );
+    await tx.stage(projectPath(services.project.root, "proseStyle"), styleBundle.proseStyle, "update prose style");
+    await tx.stage(projectPath(services.project.root, "povRules"), styleBundle.povRules, "update POV rules");
+    await tx.stage(projectPath(services.project.root, "tabooList"), styleBundle.tabooList, "update taboo list");
+
+    return {
+      analysis,
+      transactionId: tx.id,
+      stagedFiles: [
+        projectPath(services.project.root, "proseStyle"),
+        projectPath(services.project.root, "povRules"),
+        projectPath(services.project.root, "tabooList"),
+      ],
+    };
+  } finally {
+    services.close();
+  }
+}
+
+export async function listTransactions(
+  directory: string,
+  options: { includeClosed?: boolean } = {},
+): Promise<TransactionRecord[]> {
+  const root = path.resolve(directory);
+  const transactionsRoot = path.join(root, PATHS.transactions);
+  if (!(await exists(transactionsRoot))) {
+    return [];
+  }
+
+  const entries = await fs.readdir(transactionsRoot, { withFileTypes: true });
+  const records: TransactionRecord[] = [];
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) {
+      continue;
+    }
+
+    const status = await readJsonIfExists<{ state: TransactionState; description: string; updatedAt: string }>(
+      path.join(transactionsRoot, entry.name, "status.json"),
+    );
+    if (status === null) {
+      continue;
+    }
+
+    if (!options.includeClosed && isClosedState(status.state)) {
+      continue;
+    }
+
+    const manifest = await readJsonIfExists<Manifest>(path.join(transactionsRoot, entry.name, "manifest.json"));
+    const operations = manifest?.operations ?? [];
+
+    records.push({
+      id: entry.name,
+      state: status.state,
+      description: status.description,
+      updatedAt: status.updatedAt,
+      operationCount: operations.length,
+      targets: operations.map((operation) => operation.target),
+    });
+  }
+
+  return records.sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+}
+
+export async function getTransactionDiff(
+  directory: string,
+  transactionId?: string,
+  transactionManager = new TransactionManager(),
+): Promise<TransactionDiffWorkflowResult> {
+  const record = await resolveTransactionRecord(directory, transactionId);
+  const transaction = await transactionManager.open(path.resolve(directory), record.id);
+  const diffs = await transaction.getDiff();
+
+  return {
+    record,
+    diffs,
+    formatted: formatTransactionDiff(record, diffs),
+  };
+}
+
+export async function commitTransaction(
+  directory: string,
+  transactionId?: string,
+  transactionManager = new TransactionManager(),
+): Promise<string> {
+  const record = await resolveTransactionRecord(directory, transactionId);
+  if (record.state === "committed") {
+    return `事务 ${record.id} 已经提交，无需重复提交。`;
+  }
+
+  const transaction = await transactionManager.open(path.resolve(directory), record.id);
+  await transaction.commit();
+  return `已提交事务 ${record.id}：${transaction.description}`;
+}
+
+export async function rollbackTransaction(
+  directory: string,
+  transactionId?: string,
+  transactionManager = new TransactionManager(),
+): Promise<string> {
+  const record = await resolveTransactionRecord(directory, transactionId);
+  if (record.state === "rolled_back") {
+    return `事务 ${record.id} 已经回滚，无需重复回滚。`;
+  }
+
+  const transaction = await transactionManager.open(path.resolve(directory), record.id);
+  await transaction.rollback();
+  return `已回滚事务 ${record.id}：${transaction.description}`;
+}
+
 export function formatReviewReport(report: ReviewReport): string {
   const issueLines =
     report.issues.length > 0
@@ -293,6 +480,45 @@ export function formatReviewReport(report: ReviewReport): string {
     "问题清单：",
     ...issueLines,
   ].join("\n");
+}
+
+export function formatTransactionHistory(records: TransactionRecord[]): string {
+  if (records.length === 0) {
+    return "当前没有事务记录。";
+  }
+
+  return records
+    .map((record, index) =>
+      [
+        `${index + 1}. ${record.id}`,
+        `   状态：${record.state} | 操作数：${record.operationCount}`,
+        `   描述：${record.description}`,
+        `   更新时间：${record.updatedAt}`,
+        record.targets.length > 0 ? `   目标：${record.targets.slice(0, 3).join("，")}` : null,
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    )
+    .join("\n\n");
+}
+
+async function resolveTransactionRecord(directory: string, transactionId?: string): Promise<TransactionRecord> {
+  const records = await listTransactions(directory, { includeClosed: true });
+  if (records.length === 0) {
+    throw new ProjectError("当前没有任何事务记录。");
+  }
+
+  if (transactionId) {
+    const matched = records.find((record) => record.id === transactionId);
+    if (!matched) {
+      throw new ProjectError(`未找到事务: ${transactionId}`);
+    }
+
+    return matched;
+  }
+
+  const latestPending = records.find((record) => !isClosedState(record.state));
+  return latestPending ?? records[0]!;
 }
 
 async function loadChapterBrief(
@@ -330,10 +556,92 @@ async function resolveVolumeNumber(
   return Math.max(status.currentVolume, 1);
 }
 
+function parseStyleBundle(
+  analysis: string,
+  existing: { proseStyle: string; povRules: string; tabooList: string },
+): { proseStyle: string; povRules: string; tabooList: string } {
+  const sections = {
+    pov: extractMarkdownSection(analysis, "叙事视角"),
+    density: extractMarkdownSection(analysis, "散文密度"),
+    rhythm: extractMarkdownSection(analysis, "节奏控制"),
+    dialogue: extractMarkdownSection(analysis, "对话风格"),
+    description: extractMarkdownSection(analysis, "描写原则"),
+    taboo: extractMarkdownSection(analysis, "禁忌清单"),
+    sample: extractMarkdownSection(analysis, "参考样本"),
+  };
+
+  const proseSections = [
+    ["散文密度", sections.density],
+    ["节奏控制", sections.rhythm],
+    ["对话风格", sections.dialogue],
+    ["描写原则", sections.description],
+    ["参考样本", sections.sample],
+  ].filter((section) => section[1]);
+
+  return {
+    proseStyle:
+      proseSections.length > 0
+        ? ["# 文风规格", "", ...proseSections.flatMap(([title, content]) => [`## ${title}`, content ?? "", ""])].join("\n").trimEnd() + "\n"
+        : existing.proseStyle,
+    povRules: sections.pov ? `# POV 规则\n\n${sections.pov.trim()}\n` : existing.povRules,
+    tabooList: sections.taboo ? `# 禁忌清单\n\n${sections.taboo.trim()}\n` : existing.tabooList,
+  };
+}
+
+function extractMarkdownSection(markdown: string, title: string): string | null {
+  const pattern = new RegExp(`##\\s+${escapeRegExp(title)}\\s*\\n([\\s\\S]*?)(?=\\n##\\s+|$)`, "u");
+  const match = pattern.exec(markdown);
+  return match?.[1]?.trim() ?? null;
+}
+
+function formatTransactionDiff(record: TransactionRecord, diffs: DiffResult[]): string {
+  const lines = [
+    `事务：${record.id}`,
+    `状态：${record.state}`,
+    `描述：${record.description}`,
+    `操作数：${record.operationCount}`,
+    "",
+  ];
+
+  if (diffs.length === 0) {
+    lines.push("当前事务没有差异内容。");
+    return lines.join("\n");
+  }
+
+  for (const [index, diff] of diffs.entries()) {
+    lines.push(`${index + 1}. ${diff.target} [${diff.type}]`);
+    if (diff.oldContent !== null) {
+      lines.push(`   原内容：${summarizeText(diff.oldContent)}`);
+    } else {
+      lines.push("   原内容：<新建文件>");
+    }
+    if (diff.newContent !== null) {
+      lines.push(`   新内容：${summarizeText(diff.newContent)}`);
+    } else {
+      lines.push("   新内容：<删除文件>");
+    }
+  }
+
+  return lines.join("\n");
+}
+
+function summarizeText(content: string): string {
+  const flat = content.replace(/\s+/gu, " ").trim();
+  return truncate(flat, 140);
+}
+
 function truncate(text: string, maxLength: number): string {
   if (text.length <= maxLength) {
     return text;
   }
 
   return `${text.slice(0, maxLength - 3)}...`;
+}
+
+function isClosedState(state: TransactionState): boolean {
+  return state === "committed" || state === "rolled_back";
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 }

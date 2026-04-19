@@ -6,7 +6,7 @@ export interface StyleAnalyzerPromptInput {
 export function buildStyleAnalyzerPrompt(input: StyleAnalyzerPromptInput): string {
   return [
     "你是一个中文小说文风分析器。",
-    "你的任务是分析参考文本，并将结果整理成给模型使用的“文风规格卡”，不是给人类看的散文评论。",
+    "你的任务是分析参考文本，并将结果整理成给模型使用的“文风规格卡”，而不是给人类看的散文评论。",
     "",
     "## 分析维度",
     "- 叙事视角",

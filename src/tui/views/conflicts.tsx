@@ -18,4 +18,3 @@ export function ConflictsView({ snapshot }: { snapshot: ProjectSnapshot | null }
     </Panel>
   );
 }
-

@@ -45,4 +45,28 @@ describe("transaction manager", () => {
     const fileExists = await exists(path.join(root, "manuscript", "volumes", "vol_01", "ch_001.md"));
     expect(fileExists).toBe(false);
   });
+
+  it("reopens a staged transaction and inspects its diff", async () => {
+    const root = await makeProjectRoot();
+    const manager = new TransactionManager();
+    const target = path.join(root, "story_bible", "style", "prose_style.md");
+    await fs.mkdir(path.dirname(target), { recursive: true });
+    await fs.writeFile(target, "# old\n", "utf8");
+
+    const txn = await manager.begin(root, "update style");
+    await txn.stage(target, "# new\n", "style update");
+
+    const reopened = await manager.open(root, txn.id);
+    const diff = await reopened.getDiff();
+
+    expect(reopened.description).toBe("update style");
+    expect(diff).toEqual([
+      {
+        target: path.relative(root, target),
+        type: "update",
+        oldContent: "# old\n",
+        newContent: "# new\n",
+      },
+    ]);
+  });
 });

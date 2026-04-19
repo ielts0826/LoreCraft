@@ -9,10 +9,10 @@ export function MemoryView({ snapshot }: { snapshot: ProjectSnapshot | null }) {
   const status = snapshot?.status;
   const entityItems = status
     ? [
-        { label: `人物`, meta: String(status.canonStats.characters) },
-        { label: `地点`, meta: String(status.canonStats.locations) },
-        { label: `势力`, meta: String(status.canonStats.factions) },
-        { label: `总实体`, meta: String(status.canonStats.totalEntities) },
+        { label: "人物", meta: String(status.canonStats.characters) },
+        { label: "地点", meta: String(status.canonStats.locations) },
+        { label: "势力", meta: String(status.canonStats.factions) },
+        { label: "总实体", meta: String(status.canonStats.totalEntities) },
       ]
     : [{ label: "未加载", meta: "-" }];
 
@@ -37,4 +37,3 @@ export function MemoryView({ snapshot }: { snapshot: ProjectSnapshot | null }) {
     </Box>
   );
 }
-

@@ -35,6 +35,7 @@ function LoreCraftApp({ directory }: { directory: string }) {
     snapshot,
     onDirectoryChange: setCurrentDirectory,
     onViewChange: setActiveView,
+    onAfterCommand: refresh,
   });
   const tasks = buildTaskItems(snapshot ?? fallbackSnapshot(currentDirectory, error), messages);
   const width = process.stdout.columns ?? 120;

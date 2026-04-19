@@ -3,8 +3,8 @@ import path from "node:path";
 
 import { ProjectManager } from "../core/project.js";
 import { PATHS, projectPath } from "../shared/constants.js";
-import { exists, readTextIfExists } from "../shared/utils.js";
-import type { ProjectStatus } from "../shared/types.js";
+import { exists, readJsonIfExists, readTextIfExists } from "../shared/utils.js";
+import type { Manifest, ProjectStatus } from "../shared/types.js";
 
 export type TuiViewId = "dashboard" | "chat" | "memory" | "outline" | "tasks" | "conflicts" | "confirm" | "diff";
 
@@ -27,6 +27,8 @@ export interface PendingTransactionInfo {
   state: string;
   description: string;
   updatedAt: string;
+  operationCount: number;
+  targets: string[];
 }
 
 export interface ProjectSnapshot {
@@ -105,7 +107,7 @@ export async function readProjectSnapshot(
       pendingTransactions: [],
       commandHints: [
         "/init <name> 初始化项目",
-        "/open <目录> 重新指定目录",
+        "/open <目录> 切换目录",
         "/help 查看支持命令",
       ],
       problem: error instanceof Error ? error.message : String(error),
@@ -116,28 +118,48 @@ export async function readProjectSnapshot(
 export function buildTaskItems(snapshot: ProjectSnapshot, messages: CommandMessage[]): TaskItem[] {
   if (!snapshot.isProject || snapshot.status === null) {
     return [
-      { title: "初始化工程", detail: "当前目录还不是 LoreCraft 项目，可先执行 /init。", tone: "danger" },
-      { title: "加载项目目录", detail: "或用 `lorecraft tui -d <项目路径>` 进入已有项目。", tone: "neutral" },
+      {
+        title: "初始化工程",
+        detail: "当前目录还不是 LoreCraft 项目，可以先执行 /init。",
+        tone: "danger",
+      },
+      {
+        title: "加载项目目录",
+        detail: "或用 `lorecraft tui -d <项目路径>` 进入已有项目。",
+        tone: "neutral",
+      },
     ];
   }
 
   const items: TaskItem[] = [];
   if (snapshot.status.totalChaptersPlanned === 0) {
-    items.push({ title: "补章节简报", detail: "还没有 `chapter_briefs`，建议先建立第一卷章节骨架。", tone: "danger" });
+    items.push({
+      title: "补章节简报",
+      detail: "还没有 chapter briefs，建议先建立第一卷章节骨架。",
+      tone: "danger",
+    });
   }
 
   if (snapshot.openLoops.length > 0) {
     items.push({
       title: "回收伏笔",
-      detail: `当前有 ${snapshot.openLoops.length} 条未回收伏笔，可以先做 /check 或 /write。`,
+      detail: `当前有 ${snapshot.openLoops.length} 条未回收伏笔，可先做 /check 或 /write。`,
       tone: "neutral",
+    });
+  }
+
+  if (snapshot.pendingTransactions.length > 0) {
+    items.push({
+      title: "处理待确认事务",
+      detail: `当前有 ${snapshot.pendingTransactions.length} 个待处理事务，可用 /diff、/commit、/rollback。`,
+      tone: "danger",
     });
   }
 
   if (snapshot.status.pendingConfirmations > 0) {
     items.push({
       title: "处理待确认项",
-      detail: `审校/抽取留下 ${snapshot.status.pendingConfirmations} 条待确认记录。`,
+      detail: `审校或抽取留下 ${snapshot.status.pendingConfirmations} 条待确认记录。`,
       tone: "danger",
     });
   }
@@ -145,7 +167,7 @@ export function buildTaskItems(snapshot: ProjectSnapshot, messages: CommandMessa
   if (messages.length > 0) {
     items.push({
       title: "继续当前会话",
-      detail: `最近一条消息来自 ${messages.at(-1)?.role === "user" ? "你" : "系统"}，可以在对话页继续。`,
+      detail: `最近一条消息来自 ${messages.at(-1)?.role === "user" ? "你" : "系统"}，可继续在对话页操作。`,
       tone: "success",
     });
   }
@@ -153,7 +175,7 @@ export function buildTaskItems(snapshot: ProjectSnapshot, messages: CommandMessa
   if (items.length === 0) {
     items.push({
       title: "项目状态平稳",
-      detail: "当前没有明显阻塞，可以直接在对话页输入 /write、/lookup 或 /plan。",
+      detail: "当前没有明显阻塞，可以直接输入 /write、/lookup 或 /plan。",
       tone: "success",
     });
   }
@@ -162,11 +184,7 @@ export function buildTaskItems(snapshot: ProjectSnapshot, messages: CommandMessa
 }
 
 function buildCommandHints(status: ProjectStatus): string[] {
-  const hints = [
-    "/help",
-    "/status",
-    "/lookup 主角",
-  ];
+  const hints = ["/help", "/status", "/lookup 主角", "/history"];
 
   if (status.totalChaptersPlanned > 0) {
     hints.push(`/write ch${String(Math.max(status.currentChapter, 1)).padStart(3, "0")}`);
@@ -215,17 +233,23 @@ async function readPendingTransactions(root: string): Promise<PendingTransaction
       continue;
     }
 
-    const status = await readTextIfExists(path.join(transactionsRoot, entry.name, "status.json"));
-    if (!status) {
+    const status = await readJsonIfExists<{ state?: string; description?: string; updatedAt?: string }>(
+      path.join(transactionsRoot, entry.name, "status.json"),
+    );
+    if (status === null) {
       continue;
     }
 
-    const parsed = JSON.parse(status) as { state?: string; description?: string; updatedAt?: string };
+    const manifest = await readJsonIfExists<Manifest>(path.join(transactionsRoot, entry.name, "manifest.json"));
+    const operations = manifest?.operations ?? [];
+
     transactions.push({
       id: entry.name,
-      state: parsed.state ?? "unknown",
-      description: parsed.description ?? "未命名事务",
-      updatedAt: parsed.updatedAt ?? "unknown",
+      state: status.state ?? "unknown",
+      description: status.description ?? "未命名事务",
+      updatedAt: status.updatedAt ?? "unknown",
+      operationCount: operations.length,
+      targets: operations.map((operation) => operation.target),
     });
   }
 
@@ -273,4 +297,3 @@ async function readHeadingPreview(filePath: string, limit: number): Promise<stri
     .slice(0, limit)
     .map((line) => line.replace(/^## /u, ""));
 }
-

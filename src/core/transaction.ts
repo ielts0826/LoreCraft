@@ -8,8 +8,10 @@ import { ensureDir, exists, readJsonIfExists, readTextIfExists, sha256, writeJso
 import { eventBus } from "./event-bus.js";
 import { assertPathInProject, classifyOperationRisk } from "./permissions.js";
 
+export type TransactionState = "planning" | "staging" | "committed" | "rolled_back" | "failed";
+
 interface TransactionStatus {
-  state: "planning" | "staging" | "committed" | "rolled_back" | "failed";
+  state: TransactionState;
   description: string;
   updatedAt: string;
 }
@@ -22,7 +24,7 @@ function relativeTarget(projectRoot: string, targetPath: string): string {
 
 export class FileTransaction {
   public readonly id: string;
-  public readonly description: string;
+  public description: string;
   public status: TransactionStatus["state"] = "planning";
 
   private readonly txnRoot: string;
@@ -53,6 +55,33 @@ export class FileTransaction {
     await ensureDir(this.backupRoot);
     await this.writeManifest();
     await this.writeStatus("planning");
+  }
+
+  public async load(): Promise<void> {
+    const status = await readJsonIfExists<TransactionStatus>(this.statusPath);
+    if (status === null) {
+      throw new TransactionError(`事务状态不存在: ${this.id}`);
+    }
+
+    const manifest = await readJsonIfExists<Manifest>(this.manifestPath);
+    if (manifest === null) {
+      throw new TransactionError(`事务清单不存在: ${this.id}`);
+    }
+
+    this.status = status.state;
+    this.description = status.description;
+    this.plannedOperations.splice(0, this.plannedOperations.length, ...manifest.operations);
+    this.afterContents.clear();
+
+    for (const operation of manifest.operations) {
+      if (operation.type === "delete") {
+        this.afterContents.set(operation.target, null);
+        continue;
+      }
+
+      const stagedContent = await readTextIfExists(path.join(this.stagedRoot, operation.target));
+      this.afterContents.set(operation.target, stagedContent ?? operation.content ?? null);
+    }
   }
 
   public plan(operations: Operation[]): void {
@@ -156,8 +185,9 @@ export class FileTransaction {
   public async getDiff(): Promise<DiffResult[]> {
     const diffs: DiffResult[] = [];
     for (const operation of this.plannedOperations) {
+      const backupPath = path.join(this.backupRoot, operation.target);
       const absoluteTarget = path.join(this.projectRoot, operation.target);
-      const oldContent = await readTextIfExists(absoluteTarget);
+      const oldContent = (await readTextIfExists(backupPath)) ?? (await readTextIfExists(absoluteTarget));
       diffs.push({
         target: operation.target,
         type: operation.type,
@@ -251,6 +281,12 @@ export class TransactionManager {
   public async begin(projectRoot: string, description: string): Promise<FileTransaction> {
     const transaction = new FileTransaction(projectRoot, description);
     await transaction.initialize();
+    return transaction;
+  }
+
+  public async open(projectRoot: string, transactionId: string): Promise<FileTransaction> {
+    const transaction = new FileTransaction(projectRoot, transactionId, transactionId);
+    await transaction.load();
     return transaction;
   }
 

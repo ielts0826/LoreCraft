@@ -20,4 +20,3 @@ export const footerHotkeys = [
   "Ctrl+R 刷新",
   "Tab 切换视图",
 ];
-

@@ -8,11 +8,13 @@ export function useAgent({
   snapshot,
   onDirectoryChange,
   onViewChange,
+  onAfterCommand,
 }: {
   projectDir: string;
   snapshot: ProjectSnapshot | null;
   onDirectoryChange: (directory: string) => void;
   onViewChange: (view: TuiViewId) => void;
+  onAfterCommand?: () => Promise<void> | void;
 }) {
   const [messages, setMessages] = useState<CommandMessage[]>([
     {
@@ -43,6 +45,9 @@ export function useAgent({
       }
       if (result.nextView) {
         onViewChange(result.nextView);
+      }
+      if (onAfterCommand) {
+        await onAfterCommand();
       }
 
       startTransition(() => {

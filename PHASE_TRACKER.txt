@@ -11,7 +11,7 @@ Phase Summary
 - Phase 1 - Core Layer: DONE
 - Phase 2 - Memory Layer: DONE
 - Phase 3 - LLM Layer: DONE
-- Phase 4 - Prompt Layer: TODO
+- Phase 4 - Prompt Layer: DONE
 - Phase 5 - Agent Layer: TODO
 - Phase 6 - Command Layer Expansion: TODO
 - Phase 7 - TUI Layer: TODO
@@ -72,9 +72,19 @@ Added files:
 - src/llm/providers/anthropic.ts
 - tests/llm/client.test.ts
 
+Phase 4 - Prompt Layer
+Added files:
+- src/llm/prompts/system-writer.ts
+- src/llm/prompts/system-reviewer.ts
+- src/llm/prompts/system-extractor.ts
+- src/llm/prompts/system-orchestrator.ts
+- src/llm/prompts/style-analyzer.ts
+- src/llm/prompts/expand-planner.ts
+- tests/llm/prompts.test.ts
+
 In Progress
 
-- No active phase at the moment. Next recommended target: Phase 4 - Prompt Layer.
+- No active phase at the moment. Next recommended target: Phase 5 - Agent Layer.
 
 Pending Phases
 

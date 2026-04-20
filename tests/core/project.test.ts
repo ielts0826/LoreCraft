@@ -4,6 +4,7 @@ import path from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
+import { CredentialStore } from "../../src/core/credential-store.js";
 import { ProjectManager } from "../../src/core/project.js";
 import { exists, readTextIfExists } from "../../src/shared/utils.js";
 
@@ -49,5 +50,25 @@ describe("project manager", () => {
     expect(status.currentChapter).toBe(1);
     expect(status.openForeshadowing).toBe(1);
     expect(await readTextIfExists(path.join(created.root, "story_bible", "style", "prose_style.md"))).toContain("文风规格");
+  });
+
+  it("applies user-level model defaults to new projects", async () => {
+    const workspace = await makeWorkspace();
+    const credentialStore = new CredentialStore(path.join(workspace, "credentials.json"));
+    await credentialStore.setModelDefault("light", {
+      provider: "openai-compatible",
+      modelId: "glm-4.5-flash",
+      baseUrl: "https://open.bigmodel.cn/api/paas/v4/chat/completions",
+      credentialId: "default-zhipu",
+    });
+
+    const manager = new ProjectManager(undefined, undefined, credentialStore);
+    const project = await manager.create("Defaults Novel", { baseDir: workspace });
+
+    expect(project.config.models.light).toMatchObject({
+      provider: "openai-compatible",
+      modelId: "glm-4.5-flash",
+      credentialId: "default-zhipu",
+    });
   });
 });

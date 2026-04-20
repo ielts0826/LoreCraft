@@ -29,4 +29,22 @@ describe("credential store", () => {
     expect(await store.get("missing")).toBeNull();
     expect((await store.list()).map((item) => item.id)).toContain("demo-writer");
   });
+
+  it("persists user-level model defaults", async () => {
+    const workspace = await makeWorkspace();
+    const store = new CredentialStore(path.join(workspace, "credentials.json"));
+
+    await store.setModelDefault("writer", {
+      provider: "openai-compatible",
+      modelId: "glm-4.5-flash",
+      baseUrl: "https://open.bigmodel.cn/api/paas/v4/chat/completions",
+      credentialId: "default-zhipu",
+    });
+
+    expect(await store.getModelDefault("writer")).toMatchObject({
+      provider: "openai-compatible",
+      modelId: "glm-4.5-flash",
+      credentialId: "default-zhipu",
+    });
+  });
 });

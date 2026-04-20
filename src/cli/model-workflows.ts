@@ -55,7 +55,7 @@ export async function setModelBinding(
   const project = await projectManager.load(projectRoot);
   const nextConfig = structuredClone(project.config);
   const modelConfig = nextConfig.models[role];
-  const credentialId = options.credentialId ?? (options.apiKey?.trim() ? buildProjectCredentialId(nextConfig.name, role) : modelConfig.credentialId);
+  const credentialId = options.credentialId ?? (options.apiKey?.trim() ? buildGlobalCredentialId(options.provider, options.baseUrl) : modelConfig.credentialId);
 
   modelConfig.provider = options.provider;
   modelConfig.modelId = options.modelId;
@@ -80,6 +80,7 @@ export async function setModelBinding(
   }
 
   await writeProjectConfig(projectRoot, nextConfig);
+  await credentialStore.setModelDefault(role, modelConfig);
 
   let testSummary: string | null = null;
   if (options.test) {
@@ -160,6 +161,20 @@ function formatRoleSummary(
   ].join("\n");
 }
 
-function buildProjectCredentialId(projectName: string, role: TextModelRole): string {
-  return `${sanitizeProjectDirName(projectName)}-${role}`;
+function buildGlobalCredentialId(provider: string, baseUrl?: string): string {
+  const normalizedBaseUrl = baseUrl?.toLowerCase() ?? "";
+  if (provider === "openrouter") {
+    return "default-openrouter";
+  }
+  if (provider === "anthropic") {
+    return "default-anthropic";
+  }
+  if (normalizedBaseUrl.includes("moonshot")) {
+    return "default-moonshot";
+  }
+  if (normalizedBaseUrl.includes("bigmodel")) {
+    return "default-zhipu";
+  }
+
+  return `default-${sanitizeProjectDirName(provider)}`;
 }

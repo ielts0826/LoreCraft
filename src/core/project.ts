@@ -2,10 +2,11 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import YAML from "yaml";
 
+import { CredentialStore } from "./credential-store.js";
 import { DEFAULT_TEXT_FILES, PROJECT_DIRECTORIES, projectPath } from "../shared/constants.js";
 import type { ProjectPathKey } from "../shared/constants.js";
 import { ProjectError } from "../shared/errors.js";
-import type { CreateProjectOptions, LastSessionInfo, Project, ProjectStatus } from "../shared/types.js";
+import type { CreateProjectOptions, LastSessionInfo, Project, ProjectStatus, TextModelRole } from "../shared/types.js";
 import { ensureDir, exists, parseNumericSuffix, readTextIfExists, sanitizeProjectDirName } from "../shared/utils.js";
 import { createDefaultConfig, projectConfigExists, readProjectConfig } from "./config.js";
 import { eventBus } from "./event-bus.js";
@@ -16,6 +17,7 @@ export class ProjectManager {
   public constructor(
     private readonly transactions = new TransactionManager(),
     private readonly sessions = new SessionManager(),
+    private readonly credentialStore = new CredentialStore(),
   ) {}
 
   public async create(name: string, options: CreateProjectOptions = {}): Promise<Project> {
@@ -30,7 +32,7 @@ export class ProjectManager {
     }
 
     const transaction = await this.transactions.begin(root, `Initialize project ${name}`);
-    const config = createDefaultConfig(name, options.genre);
+    const config = await applyUserModelDefaults(createDefaultConfig(name, options.genre), this.credentialStore);
 
     await transaction.stage(projectPath(root, "config"), formatConfigYaml(config), "create project config");
 
@@ -209,4 +211,25 @@ async function countMarkdownFiles(directory: string): Promise<number> {
 
 function formatConfigYaml(config: Project["config"]): string {
   return YAML.stringify(config);
+}
+
+async function applyUserModelDefaults(config: Project["config"], credentialStore: CredentialStore): Promise<Project["config"]> {
+  const roles: TextModelRole[] = ["writer", "reviewer", "extractor", "light"];
+
+  for (const role of roles) {
+    const modelDefault = await credentialStore.getModelDefault(role);
+    if (!modelDefault) {
+      continue;
+    }
+
+    config.models[role] = {
+      provider: modelDefault.provider,
+      modelId: modelDefault.modelId,
+      ...(modelDefault.baseUrl ? { baseUrl: modelDefault.baseUrl } : {}),
+      ...(modelDefault.credentialId ? { credentialId: modelDefault.credentialId } : {}),
+      ...(modelDefault.apiKeyEnv ? { apiKeyEnv: modelDefault.apiKeyEnv } : {}),
+    };
+  }
+
+  return config;
 }

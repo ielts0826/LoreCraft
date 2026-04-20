@@ -1,5 +1,5 @@
 LoreCraft Phase Tracker
-Updated: 2026-04-19
+Updated: 2026-04-21
 
 Status Legend
 - DONE: completed and verified
@@ -134,12 +134,18 @@ In Progress
 
 - Phase 8 - Hardening and Optimization
 Added files:
+- src/agents/run-log.ts
+- src/agents/session-processor.ts
 - src/cli/workflows.ts
 - src/cli/model-workflows.ts
 - src/core/credential-store.ts
+- src/tools/types.ts
+- src/tools/registry.ts
+- src/tools/builtin.ts
 - src/tui/commands.ts
 - src/tui/components/command-palette.tsx
 - src/llm/providers/openai-compatible.ts
+- tests/agents/session-processor.test.ts
 - tests/tui/commands.test.ts
 - tests/core/credential-store.test.ts
 Updated existing files:
@@ -172,6 +178,7 @@ Updated existing files:
 - src/tui/views/tasks.tsx
 - src/tui/views/confirm.tsx
 - tests/core/transaction.test.ts
+- tests/core/project.test.ts
 - tests/llm/prompts.test.ts
 Completed in this phase:
 - slash command dropdown and autocompletion
@@ -191,6 +198,10 @@ Completed in this phase:
 - command palette descriptions hidden from the main UI
 - OpenAI-compatible provider for Kimi / GLM style endpoints
 - post-command project snapshot refresh in TUI
+- user-level model defaults persisted in credential store and inherited by new projects
+- natural language file query extraction for `system_prompt`-style requests
+- no-model/model-failure fallback notice with local project search instead of raw debug output
+- empty search results no longer render raw arrays like `[]`
 
 Pending Phases
 

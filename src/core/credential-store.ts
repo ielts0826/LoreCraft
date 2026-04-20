@@ -2,6 +2,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { readJsonIfExists, writeJsonAtomic } from "../shared/utils.js";
+import type { ModelConfig, TextModelRole } from "../shared/types.js";
 
 interface CredentialRecord {
   apiKey: string;
@@ -11,11 +12,17 @@ interface CredentialRecord {
 interface CredentialStoreFile {
   schemaVersion: 1;
   credentials: Record<string, CredentialRecord>;
+  modelDefaults?: Partial<Record<TextModelRole, ModelDefaultRecord>> | undefined;
+}
+
+export interface ModelDefaultRecord extends ModelConfig {
+  updatedAt: string;
 }
 
 const DEFAULT_DATA: CredentialStoreFile = {
   schemaVersion: 1,
   credentials: {},
+  modelDefaults: {},
 };
 
 export class CredentialStore {
@@ -44,6 +51,26 @@ export class CredentialStore {
     return Object.entries(data.credentials)
       .map(([id, record]) => ({ id, updatedAt: record.updatedAt }))
       .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+  }
+
+  public async getModelDefault(role: TextModelRole): Promise<ModelDefaultRecord | null> {
+    const data = await this.read();
+    return data.modelDefaults?.[role] ?? null;
+  }
+
+  public async setModelDefault(role: TextModelRole, config: ModelConfig): Promise<void> {
+    const data = await this.read();
+    data.modelDefaults = data.modelDefaults ?? {};
+    data.modelDefaults[role] = {
+      ...config,
+      updatedAt: new Date().toISOString(),
+    };
+    await writeJsonAtomic(this.filePath, data);
+  }
+
+  public async listModelDefaults(): Promise<Partial<Record<TextModelRole, ModelDefaultRecord>>> {
+    const data = await this.read();
+    return data.modelDefaults ?? {};
   }
 
   private async read(): Promise<CredentialStoreFile> {

@@ -41,4 +41,14 @@ describe("agent session processor", () => {
     expect(result.usedTools.length).toBeGreaterThan(0);
     expect(result.answer).not.toContain("识别意图");
   });
+
+  it("does not print empty raw arrays when search has no matches", async () => {
+    const projectRoot = await makeProject();
+    const processor = new AgentSessionProcessor();
+
+    const result = await processor.process(projectRoot, "看看system_prompt文件，这是文风文件");
+
+    expect(result.answer).toContain("没有在当前项目里找到匹配内容");
+    expect(result.answer).not.toContain("[]");
+  });
 });

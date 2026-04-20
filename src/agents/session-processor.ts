@@ -22,6 +22,10 @@ interface RoutePlan {
   tool_calls?: ToolCall[] | undefined;
 }
 
+interface FallbackAnswerOptions {
+  modelIssue?: string | undefined;
+}
+
 const MAX_TOOL_CALLS = 5;
 
 export class AgentSessionProcessor {
@@ -58,8 +62,13 @@ export class AgentSessionProcessor {
     const registry = createBuiltinToolRegistry();
     const services = await this.runtime.createProjectServices(projectRoot);
     try {
-      const routePlan = await this.buildRoutePlan(trimmed, services).catch(() => buildHeuristicRoutePlan(trimmed));
-      const toolCalls = normalizeToolCalls(routePlan.tool_calls ?? buildHeuristicRoutePlan(trimmed).tool_calls ?? []);
+      const heuristicPlan = buildHeuristicRoutePlan(trimmed);
+      let modelIssue: string | undefined;
+      const routePlan = await this.buildRoutePlan(trimmed, services).catch((error: unknown) => {
+        modelIssue = formatModelIssue(error);
+        return heuristicPlan;
+      });
+      const toolCalls = normalizeToolCalls(routePlan.tool_calls?.length ? routePlan.tool_calls : heuristicPlan.tool_calls ?? []);
       await logger.write({ type: "route_plan", toolCalls });
 
       const toolResults: ToolResult[] = [];
@@ -75,8 +84,10 @@ export class AgentSessionProcessor {
         });
       }
 
-      const answer = await this.buildFinalAnswer(trimmed, routePlan, toolResults, services).catch(() =>
-        formatFallbackAnswer(trimmed, toolResults, routePlan.answer),
+      const answer = await this.buildFinalAnswer(trimmed, routePlan, toolResults, services).catch((error: unknown) =>
+        formatFallbackAnswer(trimmed, toolResults, routePlan.answer, {
+          modelIssue: modelIssue ?? formatModelIssue(error),
+        }),
       );
       await logger.write({ type: "assistant_final", content: answer });
 
@@ -89,7 +100,10 @@ export class AgentSessionProcessor {
     }
   }
 
-  private async buildRoutePlan(userInput: string, services: Awaited<ReturnType<ReturnType<typeof createCommandRuntime>["createProjectServices"]>>): Promise<RoutePlan> {
+  private async buildRoutePlan(
+    userInput: string,
+    services: Awaited<ReturnType<ReturnType<typeof createCommandRuntime>["createProjectServices"]>>,
+  ): Promise<RoutePlan> {
     const modelSelection = selectModel(services.project.config, "light");
     const response = await services.llmClient.generate({
       provider: modelSelection.provider,
@@ -223,7 +237,7 @@ function buildHeuristicRoutePlan(userInput: string): RoutePlan {
     return {
       tool_calls: [
         { tool: "search_files", args: { query: mentionedFile } },
-        { tool: "read_file", args: { path: mentionedFile } },
+        ...(mentionedFile.includes(".") ? [{ tool: "read_file", args: { path: mentionedFile } }] : []),
       ],
     };
   }
@@ -241,11 +255,11 @@ function buildHeuristicRoutePlan(userInput: string): RoutePlan {
   }
 
   if (lower.includes("读取") || lower.includes("看看") || lower.includes("看一下") || lower.includes("文件")) {
-    return { tool_calls: [{ tool: "search_files", args: { query: userInput } }] };
+    return { tool_calls: [{ tool: "search_files", args: { query: extractSearchQuery(userInput) } }] };
   }
 
   return {
-    tool_calls: [{ tool: "search_files", args: { query: userInput } }],
+    tool_calls: [{ tool: "search_files", args: { query: extractSearchQuery(userInput) } }],
   };
 }
 
@@ -260,35 +274,148 @@ function extractMentionedFile(input: string): string | null {
     return txtPath.replaceAll("\\", "/");
   }
 
+  const namedFile = /([a-zA-Z0-9_.-]{3,})\s*(?:文件|檔案|file)/iu.exec(input)?.[1];
+  if (namedFile) {
+    return namedFile;
+  }
+
   return null;
 }
 
-function formatFallbackAnswer(userInput: string, toolResults: ToolResult[], directAnswer?: string): string {
+function extractSearchQuery(input: string): string {
+  const mentionedFile = extractMentionedFile(input);
+  if (mentionedFile) {
+    return mentionedFile;
+  }
+
+  return input
+    .replace(/看一下|看看|读取|打开|总结|文件|这是|文风/gu, " ")
+    .replace(/[，。,.]/gu, " ")
+    .trim()
+    .split(/\s+/u)
+    .sort((left, right) => right.length - left.length)[0] ?? input;
+}
+
+function formatFallbackAnswer(
+  userInput: string,
+  toolResults: ToolResult[],
+  directAnswer?: string,
+  options: FallbackAnswerOptions = {},
+): string {
   if (directAnswer && toolResults.length === 0) {
     return directAnswer;
   }
 
+  const modelNotice = options.modelIssue ? [`当前模型不可用，已先使用本地项目检索回答。原因：${options.modelIssue}`, ""] : [];
+
   if (toolResults.length === 0) {
-    return "我没有找到足够的项目上下文来回答。你可以直接告诉我要看的文件名、章节名或设定关键词。";
+    return [
+      ...modelNotice,
+      "我没有找到足够的项目上下文来回答。你可以直接告诉我要看的文件名、章节名或设定关键词。",
+    ].join("\n");
   }
 
   const successful = toolResults.filter((result) => result.status === "success");
   if (successful.length === 0) {
-    return `我尝试读取项目上下文，但没有成功：${toolResults.map((result) => result.error).filter(Boolean).join("；")}`;
+    return [
+      ...modelNotice,
+      `我尝试读取项目上下文，但没有成功：${toolResults.map((result) => result.error).filter(Boolean).join("；")}`,
+    ].join("\n");
+  }
+
+  const nonEmpty = successful.filter((result) => !isEmptyToolResult(result.result));
+  if (nonEmpty.length === 0) {
+    return [
+      ...modelNotice,
+      "我没有在当前项目里找到匹配内容。",
+      "",
+      "你可以尝试：",
+      "- 输入更准确的文件名或相对路径",
+      "- 先让我“列一下当前目录文件”",
+      "- 确认这个文件已经放在当前 LoreCraft 项目目录下",
+    ].join("\n");
   }
 
   return [
+    ...modelNotice,
     "我读取了相关项目上下文，摘要如下：",
     "",
-    ...successful.map((result) => `- ${summarizeToolResult(result)}`),
+    ...nonEmpty.map((result) => `- ${summarizeToolResult(result)}`),
     "",
     `你的问题是：${userInput}`,
   ].join("\n");
 }
 
 function summarizeToolResult(result: ToolResult): string {
+  if (Array.isArray(result.result)) {
+    const entries = result.result
+      .map((entry) => summarizeResultEntry(entry))
+      .filter((entry): entry is string => Boolean(entry));
+    if (entries.length > 0) {
+      return entries.slice(0, 5).join("；");
+    }
+  }
+
+  const directEntry = summarizeResultEntry(result.result);
+  if (directEntry) {
+    return directEntry;
+  }
+
   const text = JSON.stringify(result.result, null, 2).replace(/\s+/gu, " ");
   return text.length > 500 ? `${text.slice(0, 500)}...` : text;
+}
+
+function summarizeResultEntry(value: unknown): string | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  const pathValue = typeof record.path === "string" ? record.path : null;
+  const excerptValue = typeof record.excerpt === "string" ? record.excerpt : null;
+  const contentValue = typeof record.content === "string" ? record.content : null;
+
+  if (pathValue && contentValue) {
+    return `${pathValue}：${truncate(contentValue.replace(/\s+/gu, " "), 500)}`;
+  }
+
+  if (pathValue && excerptValue) {
+    return `${pathValue}：${truncate(excerptValue.replace(/\s+/gu, " "), 500)}`;
+  }
+
+  if (pathValue) {
+    return pathValue;
+  }
+
+  return null;
+}
+
+function truncate(value: string, maxLength: number): string {
+  return value.length > maxLength ? `${value.slice(0, maxLength)}...` : value;
+}
+
+function isEmptyToolResult(result: unknown): boolean {
+  return Array.isArray(result) && result.length === 0;
+}
+
+function formatModelIssue(error: unknown): string | undefined {
+  if (error instanceof LLMProviderError) {
+    if (error.message.includes("Unknown provider")) {
+      return "还没有为当前项目配置可用模型或 API Key。请用 /model 配置一次。";
+    }
+
+    if (error.statusCode) {
+      return `模型服务返回 ${error.statusCode}。请检查 API Key、模型名、额度或限流状态。`;
+    }
+
+    return "模型调用失败。请检查 /model 配置。";
+  }
+
+  if (error instanceof Error) {
+    return "模型调用失败。请检查 /model 配置或网络连接。";
+  }
+
+  return undefined;
 }
 
 function isIdentityQuestion(input: string): boolean {

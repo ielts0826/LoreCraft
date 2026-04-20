@@ -4,7 +4,6 @@ import { Markdown } from "../components/markdown.js";
 import { Panel } from "../components/panel.js";
 import { ScrollList } from "../components/scroll-list.js";
 import type { ProjectSnapshot, TaskItem } from "../model.js";
-import { splashSubtitle, splashTitle } from "../theme.js";
 
 export function DashboardView({
   snapshot,
@@ -27,10 +26,6 @@ export function DashboardView({
 
   return (
     <Box flexDirection="column" flexGrow={1}>
-      <Box flexDirection="column" alignItems="center" marginBottom={1}>
-        <Markdown content={`# ${splashTitle}\n${splashSubtitle}`} />
-      </Box>
-
       <Box flexDirection={stacked ? "column" : "row"} gap={1}>
         <Box flexGrow={1} flexBasis={0}>
           <Panel title="项目状态">

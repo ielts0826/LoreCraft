@@ -16,6 +16,7 @@ import { ConfirmView } from "./views/confirm.js";
 import { ConflictsView } from "./views/conflicts.js";
 import { DashboardView } from "./views/dashboard.js";
 import { DiffView } from "./views/diff.js";
+import { HomeView } from "./views/home.js";
 import { MemoryView } from "./views/memory.js";
 import { OutlineTreeView } from "./views/outline-tree.js";
 import { TasksView } from "./views/tasks.js";
@@ -28,7 +29,7 @@ export async function launchTui({ directory }: { directory: string }): Promise<v
 function LoreCraftApp({ directory }: { directory: string }) {
   const { exit } = useApp();
   const [currentDirectory, setCurrentDirectory] = useState(path.resolve(directory));
-  const [activeView, setActiveView] = useState<TuiViewId>("dashboard");
+  const [activeView, setActiveView] = useState<TuiViewId>("home");
   const [input, setInput] = useState("");
   const [paletteIndex, setPaletteIndex] = useState(0);
   const { snapshot, loading, error, refresh } = useProject(currentDirectory);
@@ -37,6 +38,7 @@ function LoreCraftApp({ directory }: { directory: string }) {
     pending,
     submit,
     clear,
+    cancelModelWizard,
     paletteMode,
     modelWizardState,
     inputPlaceholder,
@@ -68,6 +70,7 @@ function LoreCraftApp({ directory }: { directory: string }) {
   const paletteVisible = paletteItems.length > 0;
   const activePaletteItem = paletteItems[Math.min(paletteIndex, Math.max(paletteItems.length - 1, 0))];
   const activePaletteCommand = filteredCommands[Math.min(paletteIndex, Math.max(filteredCommands.length - 1, 0))];
+  const inputMasked = modelWizardState?.step === "apiKey";
 
   useEffect(() => {
     setPaletteIndex(0);
@@ -105,6 +108,19 @@ function LoreCraftApp({ directory }: { directory: string }) {
       return;
     }
 
+    if (key.escape) {
+      if (paletteMode === "wizard") {
+        cancelModelWizard();
+        setInput("");
+        return;
+      }
+
+      if (paletteVisible) {
+        setInput("");
+        return;
+      }
+    }
+
     if (paletteVisible && key.downArrow) {
       setPaletteIndex((current) => (current + 1) % paletteItems.length);
       return;
@@ -125,11 +141,6 @@ function LoreCraftApp({ directory }: { directory: string }) {
       return;
     }
 
-    if (paletteVisible && key.escape) {
-      setInput("");
-      return;
-    }
-
     if (key.return) {
       if (
         paletteMode === "command" &&
@@ -144,8 +155,8 @@ function LoreCraftApp({ directory }: { directory: string }) {
         paletteMode === "wizard" && input.trim().startsWith("/")
           ? input
           : paletteMode === "wizard" && activePaletteItem
-          ? activePaletteItem.template
-          : input;
+            ? activePaletteItem.template
+            : input;
       void submit(submitValue);
       setInput("");
       return;
@@ -176,6 +187,7 @@ function LoreCraftApp({ directory }: { directory: string }) {
       </Box>
 
       <Box flexGrow={1} minHeight={20}>
+        {activeView === "home" ? <HomeView snapshot={snapshot} /> : null}
         {activeView === "dashboard" ? <DashboardView snapshot={snapshot} tasks={tasks} width={width} /> : null}
         {activeView === "chat" ? <ChatView messages={messages} /> : null}
         {activeView === "memory" ? <MemoryView snapshot={snapshot} /> : null}
@@ -187,7 +199,7 @@ function LoreCraftApp({ directory }: { directory: string }) {
       </Box>
 
       <Box marginTop={1}>
-        <CommandInput value={input} placeholder={inputPlaceholder} />
+        <CommandInput value={input} placeholder={inputPlaceholder} masked={inputMasked} />
       </Box>
       {paletteVisible ? (
         <Box marginTop={1}>

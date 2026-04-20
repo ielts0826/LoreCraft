@@ -30,7 +30,7 @@ describe("model wizard", () => {
     });
     expect(resolveProviderChoice("zhipu")).toEqual({
       provider: "openai-compatible",
-      baseUrl: "https://open.bigmodel.cn/api/paas/v4",
+      baseUrl: "https://open.bigmodel.cn/api/paas/v4/chat/completions",
     });
   });
 });

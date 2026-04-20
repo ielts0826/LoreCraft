@@ -165,9 +165,9 @@ export const tuiCommandSpecs: readonly TuiCommandSpec[] = [
   },
   {
     name: "/view",
-    synopsis: "/view <dashboard|chat|memory|outline|tasks|conflicts|confirm|diff>",
+    synopsis: "/view <home|dashboard|chat|memory|outline|tasks|conflicts|confirm|diff>",
     description: "切换工作台视图",
-    template: "/view chat",
+    template: "/view home",
     keywords: ["screen", "tab"],
     requiresArguments: true,
   },
@@ -447,6 +447,14 @@ export async function executeTuiInput(
 
     case "/check": {
       assertProjectLoaded(snapshot);
+      if (!positionals[0]) {
+        return {
+          title: "项目检查",
+          body: "已打开项目状态页。这里包含项目状态、建议动作、即时概览和快捷命令。",
+          nextView: "dashboard",
+        };
+      }
+
       const report = await reviewChapter(
         projectDir,
         positionals[0],

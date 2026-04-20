@@ -6,7 +6,7 @@ import { PATHS, projectPath } from "../shared/constants.js";
 import type { Manifest, ProjectStatus } from "../shared/types.js";
 import { exists, readJsonIfExists, readTextIfExists } from "../shared/utils.js";
 
-export type TuiViewId = "dashboard" | "chat" | "memory" | "outline" | "tasks" | "conflicts" | "confirm" | "diff";
+export type TuiViewId = "home" | "dashboard" | "chat" | "memory" | "outline" | "tasks" | "conflicts" | "confirm" | "diff";
 
 export interface CommandMessage {
   id: string;
@@ -52,8 +52,9 @@ export interface TaskItem {
 }
 
 export const viewOrder: readonly TuiViewId[] = [
-  "dashboard",
+  "home",
   "chat",
+  "dashboard",
   "memory",
   "outline",
   "tasks",
@@ -63,7 +64,8 @@ export const viewOrder: readonly TuiViewId[] = [
 ];
 
 export const viewLabels: Readonly<Record<TuiViewId, string>> = {
-  dashboard: "仪表盘",
+  home: "首页",
+  dashboard: "项目",
   chat: "对话",
   memory: "记忆",
   outline: "大纲",

@@ -68,7 +68,7 @@ export function getModelWizardPrompt(state: ModelWizardState): { title: string; 
     case "apiKey":
       return {
         title: "模型向导",
-        body: "最后一步：请输入 API Key，回车后会自动保存并测试连接。",
+        body: "最后一步：请输入 API Key，回车后会自动保存并测试连接。按 Esc 可退出。",
         placeholder: "输入 API Key",
       };
   }
@@ -125,7 +125,7 @@ export function resolveProviderChoice(choice: ModelProviderChoice, customBaseUrl
     case "zhipu":
       return {
         provider: "openai-compatible",
-        baseUrl: "https://open.bigmodel.cn/api/paas/v4",
+        baseUrl: "https://open.bigmodel.cn/api/paas/v4/chat/completions",
       };
 
     case "custom":

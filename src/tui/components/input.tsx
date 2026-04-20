@@ -6,12 +6,14 @@ export function CommandInput({
   value,
   placeholder,
   focused = true,
+  masked = false,
 }: {
   value: string;
   placeholder: string;
   focused?: boolean;
+  masked?: boolean;
 }) {
-  const displayValue = value.length > 0 ? value : placeholder;
+  const displayValue = value.length > 0 ? (masked ? "*".repeat(Math.min(value.length, 32)) : value) : placeholder;
 
   return (
     <Box flexDirection="row" alignItems="center">

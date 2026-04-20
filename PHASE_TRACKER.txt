@@ -182,6 +182,8 @@ Completed in this phase:
 - project-local model binding plus user-local credential storage
 - `/model` view, bind, and connection test workflow
 - `/model` step-by-step wizard with role/provider dropdown selection
+- `/model` Esc cancel flow and fixed provider endpoints
+- minimal home view as the default TUI landing page
 - OpenAI-compatible provider for Kimi / GLM style endpoints
 - post-command project snapshot refresh in TUI
 

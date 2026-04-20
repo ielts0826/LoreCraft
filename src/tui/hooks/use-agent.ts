@@ -23,7 +23,7 @@ export function useAgent({
       id: "welcome",
       role: "system",
       title: "LoreCraft 已就绪",
-      body: "可以输入 /help、/status、/lookup，或直接输入一个写作意图。输入 /model 可进入模型绑定向导。",
+      body: "输入 / 打开命令面板，输入 /model 进入模型绑定向导。",
       timestamp: new Date().toISOString(),
     },
   ]);
@@ -34,6 +34,7 @@ export function useAgent({
     () => (modelWizard ? getModelWizardPrompt(modelWizard) : null),
     [modelWizard],
   );
+
   async function submit(rawInput: string) {
     const input = rawInput.trim();
     if (!input) {
@@ -42,7 +43,7 @@ export function useAgent({
 
     setPending(true);
     startTransition(() => {
-      setMessages((current) => [...current, createMessage("user", "你", input)]);
+      setMessages((current) => [...current, createMessage("user", "你", shouldMaskInput(modelWizard) ? "<API Key 已输入>" : input)]);
     });
 
     try {
@@ -57,7 +58,7 @@ export function useAgent({
         setModelWizard(nextState);
         const prompt = getModelWizardPrompt(nextState);
         startTransition(() => {
-          setMessages((current) => [...current, createMessage("assistant", prompt.title, `${prompt.body}\n\n输入 /cancel 可退出向导。`)]);
+          setMessages((current) => [...current, createMessage("assistant", prompt.title, `${prompt.body}\n\n按 Esc 或输入 /cancel 可退出向导。`)]);
         });
         return;
       }
@@ -93,21 +94,12 @@ export function useAgent({
 
   async function handleModelWizardInput(input: string): Promise<void> {
     if (!snapshot?.isProject) {
-      setModelWizard(null);
-      startTransition(() => {
-        setMessages((current) => [
-          ...current,
-          createMessage("assistant", "模型向导", "当前目录还不是 LoreCraft 项目。请先执行 /init 或 /open。"),
-        ]);
-      });
+      cancelModelWizard("当前目录还不是 LoreCraft 项目。请先执行 /init 或 /open。");
       return;
     }
 
     if (input === "/cancel") {
-      setModelWizard(null);
-      startTransition(() => {
-        setMessages((current) => [...current, createMessage("assistant", "模型向导", "已取消模型绑定向导。")]);
-      });
+      cancelModelWizard("已取消模型绑定向导。");
       return;
     }
 
@@ -115,70 +107,56 @@ export function useAgent({
       case "role": {
         const role = resolveRoleInput(input);
         if (!role) {
-          return appendWizardError("角色无效，请从 writer / reviewer / extractor / light 中选择。");
+          appendWizardError("角色无效，请从 writer / reviewer / extractor / light 中选择。");
+          return;
         }
 
-        const nextState: ModelWizardState = { ...modelWizard, step: "provider", role };
-        setModelWizard(nextState);
-        const prompt = getModelWizardPrompt(nextState);
-        startTransition(() => {
-          setMessages((current) => [...current, createMessage("assistant", prompt.title, prompt.body)]);
-        });
+        advanceWizard({ ...modelWizard, step: "provider", role });
         return;
       }
 
       case "provider": {
         const providerChoice = resolveProviderInput(input);
         if (!providerChoice) {
-          return appendWizardError("供应商无效，请从 anthropic / openrouter / moonshot / zhipu / custom 中选择。");
+          appendWizardError("供应商无效，请从 anthropic / openrouter / moonshot / zhipu / custom 中选择。");
+          return;
         }
 
-        const nextState: ModelWizardState =
+        advanceWizard(
           providerChoice === "custom"
             ? { ...modelWizard, step: "baseUrl", providerChoice }
-            : { ...modelWizard, step: "modelId", providerChoice };
-        setModelWizard(nextState);
-        const prompt = getModelWizardPrompt(nextState);
-        startTransition(() => {
-          setMessages((current) => [...current, createMessage("assistant", prompt.title, prompt.body)]);
-        });
+            : { ...modelWizard, step: "modelId", providerChoice },
+        );
         return;
       }
 
       case "baseUrl": {
         const baseUrl = input.trim();
         if (!/^https?:\/\//u.test(baseUrl)) {
-          return appendWizardError("Base URL 必须以 http:// 或 https:// 开头。");
+          appendWizardError("Base URL 必须以 http:// 或 https:// 开头。");
+          return;
         }
 
-        const nextState: ModelWizardState = { ...modelWizard, step: "modelId", baseUrl };
-        setModelWizard(nextState);
-        const prompt = getModelWizardPrompt(nextState);
-        startTransition(() => {
-          setMessages((current) => [...current, createMessage("assistant", prompt.title, prompt.body)]);
-        });
+        advanceWizard({ ...modelWizard, step: "modelId", baseUrl });
         return;
       }
 
       case "modelId": {
         const modelId = input.trim();
         if (!modelId) {
-          return appendWizardError("模型名称不能为空。");
+          appendWizardError("模型名称不能为空。");
+          return;
         }
 
-        const nextState: ModelWizardState = { ...modelWizard, step: "apiKey", modelId };
-        setModelWizard(nextState);
-        const prompt = getModelWizardPrompt(nextState);
-        startTransition(() => {
-          setMessages((current) => [...current, createMessage("assistant", prompt.title, prompt.body)]);
-        });
+        advanceWizard({ ...modelWizard, step: "apiKey", modelId });
         return;
       }
 
       case "apiKey": {
         const apiKey = input.trim();
         if (!apiKey) {
-          return appendWizardError("API Key 不能为空。");
+          appendWizardError("API Key 不能为空。");
+          return;
         }
 
         const role = modelWizard.role;
@@ -228,7 +206,23 @@ export function useAgent({
     }
   }
 
+  function advanceWizard(nextState: ModelWizardState) {
+    setModelWizard(nextState);
+    const prompt = getModelWizardPrompt(nextState);
+    startTransition(() => {
+      setMessages((current) => [...current, createMessage("assistant", prompt.title, prompt.body)]);
+    });
+  }
+
   function appendWizardError(message: string) {
+    startTransition(() => {
+      setMessages((current) => [...current, createMessage("assistant", "模型向导", message)]);
+    });
+  }
+
+  function cancelModelWizard(message = "已退出模型绑定向导，回到主聊天界面。") {
+    setModelWizard(null);
+    onViewChange("chat");
     startTransition(() => {
       setMessages((current) => [...current, createMessage("assistant", "模型向导", message)]);
     });
@@ -244,10 +238,15 @@ export function useAgent({
     pending,
     submit,
     clear,
+    cancelModelWizard,
     paletteMode: modelWizard ? ("wizard" as const) : ("command" as const),
     modelWizardState: modelWizard,
     inputPlaceholder: wizardPrompt?.placeholder ?? "输入命令或写作意图，例如 /lookup 主角、/write ch001、/plan 一个仙侠悬疑故事",
   };
+}
+
+function shouldMaskInput(modelWizard: ModelWizardState | null): boolean {
+  return modelWizard?.step === "apiKey";
 }
 
 function createMessage(role: CommandMessage["role"], title: string, body: string): CommandMessage {

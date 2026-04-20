@@ -6,9 +6,11 @@ import { tuiTheme } from "../theme.js";
 export function CommandPalette({
   items,
   activeIndex,
+  showDescription = false,
 }: {
   items: readonly PaletteItem[];
   activeIndex: number;
+  showDescription?: boolean;
 }) {
   if (items.length === 0) {
     return null;
@@ -16,15 +18,15 @@ export function CommandPalette({
 
   return (
     <Box flexDirection="column" borderStyle="round" borderColor={tuiTheme.border} paddingX={1}>
-      {items.slice(0, 8).map((item, index) => {
-        const selected = index === activeIndex;
+      {items.slice(0, 8).map((item) => {
+        const selected = items.indexOf(item) === activeIndex;
         return (
-          <Box key={item.id} flexDirection="column" marginBottom={index === items.length - 1 ? 0 : 1}>
+          <Box key={item.id} flexDirection="column">
             <Text color={selected ? tuiTheme.gold : tuiTheme.text}>
               {selected ? "> " : "  "}
               {item.label}
             </Text>
-            <Text color={tuiTheme.muted}>{item.description}</Text>
+            {showDescription ? <Text color={tuiTheme.muted}>{item.description}</Text> : null}
           </Box>
         );
       })}

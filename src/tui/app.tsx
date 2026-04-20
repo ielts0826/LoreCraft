@@ -38,6 +38,7 @@ function LoreCraftApp({ directory }: { directory: string }) {
     pending,
     submit,
     clear,
+    cancelActiveTask,
     cancelModelWizard,
     paletteMode,
     modelWizardState,
@@ -109,6 +110,12 @@ function LoreCraftApp({ directory }: { directory: string }) {
     }
 
     if (key.escape) {
+      if (pending) {
+        cancelActiveTask();
+        setInput("");
+        return;
+      }
+
       if (paletteMode === "wizard") {
         cancelModelWizard();
         setInput("");
@@ -142,6 +149,10 @@ function LoreCraftApp({ directory }: { directory: string }) {
     }
 
     if (key.return) {
+      if (pending) {
+        return;
+      }
+
       if (
         paletteMode === "command" &&
         paletteVisible &&
@@ -201,6 +212,11 @@ function LoreCraftApp({ directory }: { directory: string }) {
       <Box marginTop={1}>
         <CommandInput value={input} placeholder={inputPlaceholder} masked={inputMasked} />
       </Box>
+      {pending ? (
+        <Box marginTop={1}>
+          <Text color={tuiTheme.gold}>LoreCraft 正在处理...</Text>
+        </Box>
+      ) : null}
       {paletteVisible ? (
         <Box marginTop={1}>
           <CommandPalette items={paletteItems} activeIndex={paletteIndex} />

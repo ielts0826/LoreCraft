@@ -1,5 +1,6 @@
-import { startTransition, useMemo, useState } from "react";
+import { startTransition, useMemo, useRef, useState } from "react";
 
+import { AgentSessionProcessor } from "../../agents/session-processor.js";
 import { setModelBinding } from "../../cli/model-workflows.js";
 import { executeTuiInput } from "../commands.js";
 import { createModelWizard, getModelWizardPrompt, resolveProviderChoice, resolveProviderInput, resolveRoleInput, type ModelWizardState } from "../model-wizard.js";
@@ -18,17 +19,19 @@ export function useAgent({
   onViewChange: (view: TuiViewId) => void;
   onAfterCommand?: () => Promise<void> | void;
 }) {
+  const sessionProcessor = useMemo(() => new AgentSessionProcessor(), []);
   const [messages, setMessages] = useState<CommandMessage[]>([
     {
       id: "welcome",
       role: "system",
       title: "LoreCraft 已就绪",
-      body: "输入 / 打开命令面板，输入 /model 进入模型绑定向导。",
+      body: "直接提问即可。我会根据需要读取项目文件、检索上下文或调用写作能力。",
       timestamp: new Date().toISOString(),
     },
   ]);
   const [pending, setPending] = useState(false);
   const [modelWizard, setModelWizard] = useState<ModelWizardState | null>(null);
+  const activeRunId = useRef(0);
 
   const wizardPrompt = useMemo(
     () => (modelWizard ? getModelWizardPrompt(modelWizard) : null),
@@ -36,12 +39,18 @@ export function useAgent({
   );
 
   async function submit(rawInput: string) {
+    if (pending) {
+      return;
+    }
+
     const input = rawInput.trim();
     if (!input) {
       return;
     }
 
     setPending(true);
+    const runId = activeRunId.current + 1;
+    activeRunId.current = runId;
     startTransition(() => {
       setMessages((current) => [...current, createMessage("user", "你", shouldMaskInput(modelWizard) ? "<API Key 已输入>" : input)]);
     });
@@ -63,7 +72,24 @@ export function useAgent({
         return;
       }
 
+      if (!input.startsWith("/")) {
+        onViewChange("chat");
+        const result = await sessionProcessor.process(projectDir, input);
+        if (!isActiveRun(runId)) {
+          return;
+        }
+
+        startTransition(() => {
+          setMessages((current) => [...current, createMessage("assistant", "LoreCraft", result.answer)]);
+        });
+        return;
+      }
+
       const result = await executeTuiInput({ projectDir, snapshot }, input);
+      if (!isActiveRun(runId)) {
+        return;
+      }
+
       if (result.nextDirectory) {
         onDirectoryChange(result.nextDirectory);
       }
@@ -88,7 +114,9 @@ export function useAgent({
         ]);
       });
     } finally {
-      setPending(false);
+      if (isActiveRun(runId)) {
+        setPending(false);
+      }
     }
   }
 
@@ -233,15 +261,30 @@ export function useAgent({
     setModelWizard(null);
   }
 
+  function cancelActiveTask() {
+    activeRunId.current += 1;
+    setPending(false);
+    startTransition(() => {
+      setMessages((current) => [...current, createMessage("assistant", "LoreCraft", "已取消当前处理，后台结果会被忽略。")]);
+    });
+  }
+
+  function isActiveRun(runId: number): boolean {
+    return activeRunId.current === runId;
+  }
+
   return {
     messages,
     pending,
     submit,
     clear,
+    cancelActiveTask,
     cancelModelWizard,
     paletteMode: modelWizard ? ("wizard" as const) : ("command" as const),
     modelWizardState: modelWizard,
-    inputPlaceholder: wizardPrompt?.placeholder ?? "输入命令或写作意图，例如 /lookup 主角、/write ch001、/plan 一个仙侠悬疑故事",
+    inputPlaceholder: pending
+      ? "LoreCraft 正在处理，请稍候..."
+      : wizardPrompt?.placeholder ?? "直接提问，或输入 / 打开命令面板",
   };
 }
 

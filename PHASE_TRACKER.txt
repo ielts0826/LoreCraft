@@ -184,6 +184,11 @@ Completed in this phase:
 - `/model` step-by-step wizard with role/provider dropdown selection
 - `/model` Esc cancel flow and fixed provider endpoints
 - minimal home view as the default TUI landing page
+- natural language agent loop for ordinary user input
+- hidden JSONL run logs under `.agent/logs`
+- basic tool registry with project status, file listing, file reading, search, and outline tools
+- pending-state guard, visible processing indicator, and Esc cancel/ignore flow
+- command palette descriptions hidden from the main UI
 - OpenAI-compatible provider for Kimi / GLM style endpoints
 - post-command project snapshot refresh in TUI
 
